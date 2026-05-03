@@ -3,16 +3,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Save } from "lucide-react";
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
+import { SelectField } from "../components/SelectField";
 import { createEntry, getCompanies, getNextBatch, getSkus } from "../api/queries";
-import type { Company, Sku } from "../types/domain";
 import { ApiError } from "../api/client";
+import { localDateInputValue } from "../utils/date";
 
-function localToday() {
-  const now = new Date();
-  const offset = now.getTimezoneOffset();
-  return new Date(now.getTime() - offset * 60_000).toISOString().slice(0, 10);
-}
-const today = localToday();
+const today = localDateInputValue();
 const shifts = ["Morning", "Evening", "Night"];
 
 type FormState = {
@@ -93,35 +89,40 @@ export function NewEntry() {
         </div>
       </div>
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-4 md:grid-cols-2">
         <Field label="Date" type="date" error={errors.date} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
-        <div>
-          <span className="mb-2 block text-sm font-semibold text-ink">Shift</span>
-          <div className="grid grid-cols-3 gap-2">
-            {shifts.map((shift) => (
-              <Button key={shift} active={form.shift === shift} onClick={() => setForm({ ...form, shift })}>{shift}</Button>
-            ))}
-          </div>
-        </div>
+        <SelectField
+          label="Shift"
+          value={form.shift}
+          onChange={(e) => setForm({ ...form, shift: e.target.value })}
+          options={shifts.map((shift) => ({ label: shift, value: shift }))}
+        />
       </section>
 
-      <Chooser title="Company" items={companies.data ?? []} selectedId={form.companyId} onSelect={(company) => setForm({ ...form, companyId: company.id, skuId: "" })} />
-
-      <div>
-        <span className="mb-2 block text-sm font-semibold text-ink">SKU</span>
-        <div className="grid gap-3 md:grid-cols-3">
-          {(skus.data ?? []).map((sku: Sku) => (
-            <button
-              key={sku.id}
-              onClick={() => setForm({ ...form, skuId: sku.id })}
-              className={`min-h-24 rounded-md border p-4 text-left ${form.skuId === sku.id ? "border-brand bg-brand text-white" : "border-line bg-field text-ink"}`}
-            >
-              <span className="block text-lg font-bold">{sku.name}</span>
-              <span className="mt-1 block text-sm opacity-80">{sku.weight} g per piece | {sku.mouldCapacity} pieces per mould</span>
-            </button>
-          ))}
-        </div>
-      </div>
+      <section className="grid gap-4 md:grid-cols-2">
+        <SelectField
+          label="Company"
+          value={form.companyId}
+          onChange={(e) => setForm({ ...form, companyId: e.target.value, skuId: "" })}
+          options={[
+            { label: "Select company", value: "" },
+            ...(companies.data ?? []).map((company) => ({ label: company.name, value: company.id }))
+          ]}
+        />
+        <SelectField
+          label="SKU / Bread Variant"
+          value={form.skuId}
+          onChange={(e) => setForm({ ...form, skuId: e.target.value })}
+          disabled={!form.companyId}
+          options={[
+            { label: form.companyId ? "Select SKU" : "Select company first", value: "" },
+            ...(skus.data ?? []).map((sku) => ({
+              label: `${sku.name} (${sku.weight} g, ${sku.mouldCapacity} pieces/mould)`,
+              value: sku.id
+            }))
+          ]}
+        />
+      </section>
 
       <section className="rounded-md border border-line bg-field p-5 shadow-sm">
         <h3 className="text-xl font-bold text-ink">Mould Count</h3>
@@ -173,27 +174,4 @@ export function NewEntry() {
 
 function fieldErrors(issues: Record<string, string[]>) {
   return Object.fromEntries(Object.entries(issues).map(([key, value]) => [key, value[0] ?? "Check this field"]));
-}
-
-function Chooser({
-  title,
-  items,
-  selectedId,
-  onSelect
-}: {
-  title: string;
-  items: Company[];
-  selectedId: string;
-  onSelect: (item: Company) => void;
-}) {
-  return (
-    <div>
-      <span className="mb-2 block text-sm font-semibold text-ink">{title}</span>
-      <div className="grid gap-2 md:grid-cols-3">
-        {items.map((item) => (
-          <Button key={item.id} active={selectedId === item.id} onClick={() => onSelect(item)}>{item.name}</Button>
-        ))}
-      </div>
-    </div>
-  );
 }

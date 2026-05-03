@@ -4,10 +4,11 @@ import { getLogs } from "../api/queries";
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
 import type { Log } from "../types/domain";
+import { localDateInputValue } from "../utils/date";
 import { formatIst } from "../utils/time";
 
 export function Logs() {
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState(localDateInputValue());
   const [selectedLog, setSelectedLog] = useState<Log | null>(null);
   const logs = useQuery({ queryKey: ["logs", date], queryFn: () => getLogs(date || undefined) });
 

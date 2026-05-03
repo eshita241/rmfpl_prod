@@ -5,13 +5,18 @@ import { downloadUrl } from "../api/client";
 import { deleteEntry, getCompanies, getEntries, getSkus, updateEntry } from "../api/queries";
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
+import { SelectField } from "../components/SelectField";
 import type { ProductionEntry } from "../types/domain";
+import { currentWeekRange, localDateInputValue } from "../utils/date";
 import { formatIst } from "../utils/time";
 
 export function Reports({ isAdmin }: { isAdmin: boolean }) {
   const queryClient = useQueryClient();
-  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
-  const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10));
+  const [period, setPeriod] = useState<"single" | "week" | "range">("single");
+  const [startDate, setStartDate] = useState(localDateInputValue());
+  const [endDate, setEndDate] = useState(localDateInputValue());
+  const [downloadFormat, setDownloadFormat] = useState<"excel" | "pdf">("excel");
+  const [confirmDownload, setConfirmDownload] = useState(false);
   const [filters, setFilters] = useState({ companyId: "", skuId: "", shift: "" });
   const [entryToEdit, setEntryToEdit] = useState<ProductionEntry | null>(null);
   const [entryToArchive, setEntryToArchive] = useState<ProductionEntry | null>(null);
@@ -35,6 +40,20 @@ export function Reports({ isAdmin }: { isAdmin: boolean }) {
     }
   });
 
+  function changePeriod(nextPeriod: "single" | "week" | "range") {
+    setPeriod(nextPeriod);
+    if (nextPeriod === "single") {
+      const today = localDateInputValue();
+      setStartDate(today);
+      setEndDate(today);
+    }
+    if (nextPeriod === "week") {
+      const week = currentWeekRange();
+      setStartDate(week.startDate);
+      setEndDate(week.endDate);
+    }
+  }
+
   function download(format: "excel" | "pdf") {
     const params = new URLSearchParams({ startDate, endDate, format });
     if (filters.companyId) params.set("companyId", filters.companyId);
@@ -46,30 +65,80 @@ export function Reports({ isAdmin }: { isAdmin: boolean }) {
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-ink">Reports</h2>
-      <section className="grid gap-4 md:grid-cols-4">
-        <Field label="Start Date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-        <Field label="End Date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-        <Button className="self-end" tone="primary" onClick={() => download("excel")}><span className="inline-flex items-center gap-2"><Download size={20} /> Excel</span></Button>
-        <Button className="self-end" onClick={() => download("pdf")}><span className="inline-flex items-center gap-2"><Download size={20} /> PDF</span></Button>
+      <section className="rounded-md border border-line bg-field p-4">
+        <div className="grid gap-4 md:grid-cols-4">
+          <SelectField
+            label="Report Period"
+            value={period}
+            onChange={(e) => changePeriod(e.target.value as "single" | "week" | "range")}
+            options={[
+              { label: "Single date", value: "single" },
+              { label: "This week", value: "week" },
+              { label: "Custom range", value: "range" }
+            ]}
+          />
+          {period === "range" ? (
+            <>
+              <Field label="Start Date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              <Field label="End Date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            </>
+          ) : (
+            <Field
+              label={period === "week" ? "Week Starting" : "Report Date"}
+              type="date"
+              value={startDate}
+              disabled={period === "week"}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                setEndDate(e.target.value);
+              }}
+            />
+          )}
+          <SelectField
+            label="Download Format"
+            value={downloadFormat}
+            onChange={(e) => setDownloadFormat(e.target.value as "excel" | "pdf")}
+            options={[
+              { label: "Excel (.xlsx)", value: "excel" },
+              { label: "PDF", value: "pdf" }
+            ]}
+          />
+          <Button className="self-end" tone="primary" onClick={() => setConfirmDownload(true)}>
+            <span className="inline-flex items-center gap-2"><Download size={20} /> Download</span>
+          </Button>
+        </div>
       </section>
       <section className="rounded-md border border-line bg-field p-4">
-        <div className="grid gap-2 md:grid-cols-4">
-          <Button active={!filters.shift} onClick={() => setFilters({ ...filters, shift: "" })}>All Shifts</Button>
-          {["Morning", "Evening", "Night"].map((shift) => (
-            <Button key={shift} active={filters.shift === shift} onClick={() => setFilters({ ...filters, shift })}>{shift}</Button>
-          ))}
-        </div>
-        <div className="mt-3 grid gap-2 md:grid-cols-3">
-          <Button active={!filters.companyId} onClick={() => setFilters({ ...filters, companyId: "", skuId: "" })}>All Companies</Button>
-          {(companies.data ?? []).map((company) => (
-            <Button key={company.id} active={filters.companyId === company.id} onClick={() => setFilters({ ...filters, companyId: company.id, skuId: "" })}>{company.name}</Button>
-          ))}
-        </div>
-        <div className="mt-3 grid gap-2 md:grid-cols-3">
-          <Button active={!filters.skuId} onClick={() => setFilters({ ...filters, skuId: "" })}>All Variants</Button>
-          {(skus.data ?? []).map((sku) => (
-            <Button key={sku.id} active={filters.skuId === sku.id} onClick={() => setFilters({ ...filters, skuId: sku.id })}>{sku.name}</Button>
-          ))}
+        <div className="grid gap-4 md:grid-cols-3">
+          <SelectField
+            label="Shift"
+            value={filters.shift}
+            onChange={(e) => setFilters({ ...filters, shift: e.target.value })}
+            options={[
+              { label: "All shifts", value: "" },
+              { label: "Morning", value: "Morning" },
+              { label: "Evening", value: "Evening" },
+              { label: "Night", value: "Night" }
+            ]}
+          />
+          <SelectField
+            label="Company"
+            value={filters.companyId}
+            onChange={(e) => setFilters({ ...filters, companyId: e.target.value, skuId: "" })}
+            options={[
+              { label: "All companies", value: "" },
+              ...(companies.data ?? []).map((company) => ({ label: company.name, value: company.id }))
+            ]}
+          />
+          <SelectField
+            label="SKU / Bread Variant"
+            value={filters.skuId}
+            onChange={(e) => setFilters({ ...filters, skuId: e.target.value })}
+            options={[
+              { label: "All variants", value: "" },
+              ...(skus.data ?? []).map((sku) => ({ label: sku.name, value: sku.id }))
+            ]}
+          />
         </div>
       </section>
       <div className="overflow-x-auto rounded-md border border-line bg-field">
@@ -105,6 +174,26 @@ export function Reports({ isAdmin }: { isAdmin: boolean }) {
             <div className="mt-5 grid grid-cols-2 gap-3">
               <Button onClick={() => setEntryToArchive(null)}>Cancel</Button>
               <Button tone="danger" disabled={archiveMutation.isPending} onClick={() => archiveMutation.mutate(entryToArchive.id)}>Archive</Button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {confirmDownload ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-ink/50 p-4">
+          <section className="w-full max-w-md rounded-md border border-line bg-field p-5 shadow-xl">
+            <h3 className="text-xl font-bold text-ink">Download Report?</h3>
+            <p className="mt-3 text-ink/75">
+              This will download a {downloadFormat === "excel" ? "Excel" : "PDF"} report from {startDate} to {endDate}.
+            </p>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <Button onClick={() => setConfirmDownload(false)}>Cancel</Button>
+              <Button tone="primary" onClick={() => {
+                setConfirmDownload(false);
+                download(downloadFormat);
+              }}>
+                Download
+              </Button>
             </div>
           </section>
         </div>
@@ -181,7 +270,16 @@ function EntryEditor({
         <h3 className="text-xl font-bold text-ink">Edit Production Entry</h3>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <Field label="Date" type="date" value={draft.date.slice(0, 10)} onChange={(e) => setDraft({ ...draft, date: e.target.value })} />
-          <Field label="Shift" value={draft.shift} onChange={(e) => setDraft({ ...draft, shift: e.target.value })} />
+          <SelectField
+            label="Shift"
+            value={draft.shift}
+            onChange={(e) => setDraft({ ...draft, shift: e.target.value })}
+            options={[
+              { label: "Morning", value: "Morning" },
+              { label: "Evening", value: "Evening" },
+              { label: "Night", value: "Night" }
+            ]}
+          />
           <Field label="Quantity" type="number" value={String(draft.quantityProduced)} onChange={(e) => setDraft({ ...draft, quantityProduced: Number(e.target.value) })} />
           <Field label="Moulds Used" type="number" value={String(draft.mouldsUsed)} onChange={(e) => setDraft({ ...draft, mouldsUsed: Number(e.target.value) })} />
           <Field label="Empty Slots Per Mould" type="number" value={String(draft.emptySlotsPerMould)} onChange={(e) => setDraft({ ...draft, emptySlotsPerMould: Number(e.target.value) })} />

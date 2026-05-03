@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createSku, deleteSku, getCompanies, getSkus, getUsers, updateSku, updateUserRole } from "../api/queries";
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
+import { SelectField } from "../components/SelectField";
 
 export function Admin() {
   const queryClient = useQueryClient();
@@ -80,14 +81,18 @@ export function Admin() {
               <Field label="SKU Name" value={skuForm.name} onChange={(e) => setSkuForm({ ...skuForm, name: e.target.value })} />
               <Field label="Weight" type="number" value={skuForm.weight} onChange={(e) => setSkuForm({ ...skuForm, weight: e.target.value })} />
               <Field label="Mould Capacity" type="number" value={skuForm.mouldCapacity} onChange={(e) => setSkuForm({ ...skuForm, mouldCapacity: e.target.value })} />
+              <SelectField
+                label="Company"
+                value={skuForm.companyId}
+                onChange={(e) => setSkuForm({ ...skuForm, companyId: e.target.value })}
+                options={[
+                  { label: "Select company", value: "" },
+                  ...(companies.data ?? []).map((company) => ({ label: company.name, value: company.id }))
+                ]}
+              />
               <Button className="self-end" tone="primary" disabled={!skuForm.name || !skuForm.companyId || !skuForm.weight || !skuForm.mouldCapacity} onClick={() => skuMutation.mutate(skuForm)}>
                 Add SKU
               </Button>
-            </div>
-            <div className="mt-4 grid gap-2 md:grid-cols-3">
-              {(companies.data ?? []).map((company) => (
-                <Button key={company.id} active={skuForm.companyId === company.id} onClick={() => setSkuForm({ ...skuForm, companyId: company.id })}>{company.name}</Button>
-              ))}
             </div>
           </div>
         ) : null}
@@ -136,15 +141,19 @@ export function Admin() {
                 <span className="inline-flex items-center gap-2"><X size={18} /> Close</span>
               </Button>
             </div>
-            <div className="mt-4 grid gap-4 md:grid-cols-3">
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
               <Field label="SKU Name" value={skuForm.name} onChange={(e) => setSkuForm({ ...skuForm, name: e.target.value })} />
               <Field label="Weight" type="number" value={skuForm.weight} onChange={(e) => setSkuForm({ ...skuForm, weight: e.target.value })} />
               <Field label="Mould Capacity" type="number" value={skuForm.mouldCapacity} onChange={(e) => setSkuForm({ ...skuForm, mouldCapacity: e.target.value })} />
-            </div>
-            <div className="mt-4 grid gap-2 md:grid-cols-3">
-              {(companies.data ?? []).map((company) => (
-                <Button key={company.id} active={skuForm.companyId === company.id} onClick={() => setSkuForm({ ...skuForm, companyId: company.id })}>{company.name}</Button>
-              ))}
+              <SelectField
+                label="Company"
+                value={skuForm.companyId}
+                onChange={(e) => setSkuForm({ ...skuForm, companyId: e.target.value })}
+                options={[
+                  { label: "Select company", value: "" },
+                  ...(companies.data ?? []).map((company) => ({ label: company.name, value: company.id }))
+                ]}
+              />
             </div>
             <div className="mt-5 grid grid-cols-2 gap-3">
               <Button onClick={resetSkuForm}>Cancel</Button>
@@ -162,10 +171,16 @@ export function Admin() {
           {(users.data ?? []).map((user) => (
             <div key={user.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line p-3">
               <span><strong>{user.name}</strong><br /><small>{user.email}</small></span>
-              <div className="grid grid-cols-2 gap-2">
-                <Button active={user.role === "USER"} onClick={() => roleMutation.mutate({ id: user.id, role: "USER" })}>USER</Button>
-                <Button active={user.role === "ADMIN"} onClick={() => roleMutation.mutate({ id: user.id, role: "ADMIN" })}>ADMIN</Button>
-              </div>
+              <SelectField
+                label="Role"
+                value={user.role}
+                onChange={(e) => roleMutation.mutate({ id: user.id, role: e.target.value as "ADMIN" | "USER" })}
+                options={[
+                  { label: "USER", value: "USER" },
+                  { label: "ADMIN", value: "ADMIN" }
+                ]}
+                className="min-w-40"
+              />
             </div>
           ))}
         </div>

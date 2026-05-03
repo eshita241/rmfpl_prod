@@ -4,11 +4,13 @@ import { AlertTriangle, Archive, Pencil, Save } from "lucide-react";
 import { createDamage, deleteDamage, getDamages, getEntries, updateDamage } from "../api/queries";
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
+import { SelectField } from "../components/SelectField";
 import type { DamageEntry } from "../types/domain";
 import { formatIst } from "../utils/time";
 import { ApiError } from "../api/client";
+import { localDateInputValue } from "../utils/date";
 
-const today = new Date().toISOString().slice(0, 10);
+const today = localDateInputValue();
 
 export function Damages({ isAdmin }: { isAdmin: boolean }) {
   const queryClient = useQueryClient();
@@ -26,6 +28,11 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
   const [damageToArchive, setDamageToArchive] = useState<DamageEntry | null>(null);
 
   const entries = useQuery({ queryKey: ["entries", form.date, form.date], queryFn: () => getEntries(form.date, form.date) });
+  const editEntries = useQuery({
+    queryKey: ["entries", editForm.date, editForm.date, "damage-edit"],
+    queryFn: () => getEntries(editForm.date, editForm.date),
+    enabled: Boolean(damageToEdit)
+  });
   const damages = useQuery({ queryKey: ["damages", form.date], queryFn: () => getDamages(form.date, form.date) });
   const selectedEntry = entries.data?.find((entry) => entry.id === form.productionEntryId);
 
@@ -112,22 +119,20 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
         </div>
 
         <div className="mt-5">
-          <span className="mb-2 block text-sm font-semibold text-ink">Production Entry</span>
-          <div className="grid gap-3 md:grid-cols-3">
-            {(entries.data ?? []).map((entry) => (
-              <button
-                key={entry.id}
-                onClick={() => setForm({ ...form, productionEntryId: entry.id })}
-                className={`min-h-28 rounded-md border p-4 text-left ${form.productionEntryId === entry.id ? "border-brand bg-brand text-white" : "border-line bg-milk text-ink"}`}
-              >
-                <span className="block text-lg font-bold">{entry.sku.name}</span>
-                <span className="mt-1 block text-sm opacity-80">{entry.company.name} | {entry.shift}</span>
-                <span className="mt-2 block text-sm font-semibold opacity-90">Batch {entry.batchNumber} | Produced: {entry.quantityProduced}</span>
-              </button>
-            ))}
-          </div>
+          <SelectField
+            label="Production Entry"
+            value={form.productionEntryId}
+            onChange={(e) => setForm({ ...form, productionEntryId: e.target.value })}
+            options={[
+              { label: "Select production entry", value: "" },
+              ...(entries.data ?? []).map((entry) => ({
+                label: `${entry.sku.name} | Batch ${entry.batchNumber} | ${entry.company.name} | ${entry.shift} | Produced ${entry.quantityProduced}`,
+                value: entry.id
+              }))
+            ]}
+          />
           {entries.data?.length === 0 ? (
-            <div className="rounded-md border border-amber-200 bg-amber-50 p-4 font-semibold text-amber-900">
+            <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-4 font-semibold text-amber-900">
               No production entries found for this date. Create a production entry first.
             </div>
           ) : null}
@@ -218,19 +223,18 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
               <Field label="Amount Damaged" type="number" inputMode="numeric" value={editForm.amount} onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })} />
             </div>
             <div className="mt-5">
-              <span className="mb-2 block text-sm font-semibold text-ink">Production Entry</span>
-              <div className="grid gap-3 md:grid-cols-3">
-                {(entries.data ?? []).map((entry) => (
-                  <button
-                    key={entry.id}
-                    onClick={() => setEditForm({ ...editForm, productionEntryId: entry.id })}
-                    className={`min-h-24 rounded-md border p-4 text-left ${editForm.productionEntryId === entry.id ? "border-brand bg-brand text-white" : "border-line bg-milk text-ink"}`}
-                  >
-                    <span className="block font-bold">{entry.sku.name}</span>
-                    <span className="mt-1 block text-sm opacity-80">Batch {entry.batchNumber} | {entry.shift}</span>
-                  </button>
-                ))}
-              </div>
+              <SelectField
+                label="Production Entry"
+                value={editForm.productionEntryId}
+                onChange={(e) => setEditForm({ ...editForm, productionEntryId: e.target.value })}
+                options={[
+                  { label: "Select production entry", value: "" },
+                  ...(editEntries.data ?? []).map((entry) => ({
+                    label: `${entry.sku.name} | Batch ${entry.batchNumber} | ${entry.shift} | Produced ${entry.quantityProduced}`,
+                    value: entry.id
+                  }))
+                ]}
+              />
             </div>
             <label className="mt-5 block">
               <span className="mb-2 block text-sm font-semibold text-ink">Notes</span>

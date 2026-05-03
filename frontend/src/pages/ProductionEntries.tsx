@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { getCompanies, getEntries, getSkus } from "../api/queries";
-import { Button } from "../components/Button";
 import { Field } from "../components/Field";
+import { SelectField } from "../components/SelectField";
+import { localDateInputValue } from "../utils/date";
 import { formatIst } from "../utils/time";
 
-const today = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
-const shifts = ["", "Morning", "Evening", "Night"];
+const today = localDateInputValue();
 
 export function ProductionEntries() {
   const [filters, setFilters] = useState({ date: today, companyId: "", skuId: "", shift: "" });
@@ -27,28 +27,35 @@ export function ProductionEntries() {
       <section className="rounded-md border border-line bg-field p-4">
         <div className="grid gap-4 md:grid-cols-4">
           <Field label="Date" type="date" value={filters.date} onChange={(e) => setFilters({ ...filters, date: e.target.value })} />
-          <div>
-            <span className="mb-2 block text-sm font-semibold text-ink">Shift</span>
-            <div className="grid grid-cols-2 gap-2">
-              {shifts.map((shift) => (
-                <Button key={shift || "all"} active={filters.shift === shift} onClick={() => setFilters({ ...filters, shift })}>
-                  {shift || "All"}
-                </Button>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="mt-4 grid gap-2 md:grid-cols-3">
-          <Button active={!filters.companyId} onClick={() => setFilters({ ...filters, companyId: "", skuId: "" })}>All Companies</Button>
-          {(companies.data ?? []).map((company) => (
-            <Button key={company.id} active={filters.companyId === company.id} onClick={() => setFilters({ ...filters, companyId: company.id, skuId: "" })}>{company.name}</Button>
-          ))}
-        </div>
-        <div className="mt-4 grid gap-2 md:grid-cols-3">
-          <Button active={!filters.skuId} onClick={() => setFilters({ ...filters, skuId: "" })}>All Variants</Button>
-          {(skus.data ?? []).map((sku) => (
-            <Button key={sku.id} active={filters.skuId === sku.id} onClick={() => setFilters({ ...filters, skuId: sku.id })}>{sku.name}</Button>
-          ))}
+          <SelectField
+            label="Shift"
+            value={filters.shift}
+            onChange={(e) => setFilters({ ...filters, shift: e.target.value })}
+            options={[
+              { label: "All shifts", value: "" },
+              { label: "Morning", value: "Morning" },
+              { label: "Evening", value: "Evening" },
+              { label: "Night", value: "Night" }
+            ]}
+          />
+          <SelectField
+            label="Company"
+            value={filters.companyId}
+            onChange={(e) => setFilters({ ...filters, companyId: e.target.value, skuId: "" })}
+            options={[
+              { label: "All companies", value: "" },
+              ...(companies.data ?? []).map((company) => ({ label: company.name, value: company.id }))
+            ]}
+          />
+          <SelectField
+            label="SKU / Bread Variant"
+            value={filters.skuId}
+            onChange={(e) => setFilters({ ...filters, skuId: e.target.value })}
+            options={[
+              { label: "All variants", value: "" },
+              ...(skus.data ?? []).map((sku) => ({ label: sku.name, value: sku.id }))
+            ]}
+          />
         </div>
       </section>
 
