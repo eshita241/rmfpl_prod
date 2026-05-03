@@ -31,8 +31,16 @@ function formatIst(value: Date) {
   }).format(value);
 }
 
-export async function buildExcelReport(startDate?: string, endDate?: string) {
-  const entries = await listEntries({ startDate, endDate });
+type ReportFilters = {
+  startDate?: string;
+  endDate?: string;
+  companyId?: string;
+  skuId?: string;
+  shift?: string;
+};
+
+export async function buildExcelReport(filters: ReportFilters) {
+  const entries = await listEntries(filters);
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Production Report");
 
@@ -71,15 +79,15 @@ export async function buildExcelReport(startDate?: string, endDate?: string) {
   return workbook.xlsx.writeBuffer();
 }
 
-export async function buildPdfReport(startDate?: string, endDate?: string) {
-  const entries = await listEntries({ startDate, endDate });
+export async function buildPdfReport(filters: ReportFilters) {
+  const entries = await listEntries(filters);
   const doc = new PDFDocument({ margin: 36, size: "A4" });
   const chunks: Buffer[] = [];
 
   doc.on("data", (chunk) => chunks.push(chunk));
   doc.fontSize(18).text("Production Report", { align: "center" });
   doc.moveDown();
-  doc.fontSize(10).text(`Period: ${startDate ?? "All"} to ${endDate ?? "All"}`);
+  doc.fontSize(10).text(`Period: ${filters.startDate ?? "All"} to ${filters.endDate ?? "All"}`);
   doc.moveDown();
 
   entries.forEach((entry) => {

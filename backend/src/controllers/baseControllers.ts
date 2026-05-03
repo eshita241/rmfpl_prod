@@ -26,18 +26,21 @@ export async function getReport(req: Request, res: Response) {
     .object({
       startDate: z.string().optional(),
       endDate: z.string().optional(),
+      companyId: z.string().optional(),
+      skuId: z.string().optional(),
+      shift: z.string().optional(),
       format: z.enum(["pdf", "excel"]).default("excel")
     })
     .parse(req.query);
 
   if (query.format === "pdf") {
-    const pdf = await buildPdfReport(query.startDate, query.endDate);
+    const pdf = await buildPdfReport(query);
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", "attachment; filename=production-report.pdf");
     return res.send(pdf);
   }
 
-  const excel = await buildExcelReport(query.startDate, query.endDate);
+  const excel = await buildExcelReport(query);
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   res.setHeader("Content-Disposition", "attachment; filename=production-report.xlsx");
   return res.send(Buffer.from(excel));

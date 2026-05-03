@@ -9,7 +9,7 @@ export type EntryInput = {
   shift: string;
   companyId: string;
   skuId: string;
-  quantityProduced: number;
+  quantityProduced?: number;
   mouldsUsed: number;
   emptySlotsPerMould: number;
   notes?: string;
@@ -24,11 +24,16 @@ async function validateCapacity(input: EntryInput) {
   return {
     sku,
     totalCapacity: input.mouldsUsed * sku.mouldCapacity,
-    exceedsCapacity: input.quantityProduced > input.mouldsUsed * sku.mouldCapacity
+    quantityProduced: calculateQuantity(input.mouldsUsed, sku.mouldCapacity, input.emptySlotsPerMould),
+    exceedsCapacity: false
   };
 }
 
-async function nextBatchNumber(date: string, skuId: string, excludeId?: string) {
+function calculateQuantity(mouldsUsed: number, mouldCapacity: number, emptySlots: number) {
+  return Math.max(mouldsUsed * (mouldCapacity - emptySlots), 0);
+}
+
+export async function nextBatchNumber(date: string, skuId: string, excludeId?: string) {
   const count = await prisma.productionEntry.count({
     where: {
       date: new Date(date),
@@ -62,6 +67,7 @@ export async function createEntry(input: EntryInput, createdBy: string) {
   const entry = await prisma.productionEntry.create({
     data: {
       ...input,
+      quantityProduced: capacity.quantityProduced,
       date: new Date(input.date),
       batchNumber,
       notes: input.notes?.trim() || null,
@@ -81,10 +87,13 @@ export async function createEntry(input: EntryInput, createdBy: string) {
   return { entry, ...capacity };
 }
 
-export async function listEntries(filters: { startDate?: string; endDate?: string }) {
+export async function listEntries(filters: { startDate?: string; endDate?: string; companyId?: string; skuId?: string; shift?: string }) {
   return prisma.productionEntry.findMany({
     where: {
       deletedAt: null,
+      companyId: filters.companyId || undefined,
+      skuId: filters.skuId || undefined,
+      shift: filters.shift || undefined,
       date: {
         gte: filters.startDate ? new Date(filters.startDate) : undefined,
         lte: filters.endDate ? new Date(`${filters.endDate}T23:59:59.999Z`) : undefined
@@ -102,7 +111,7 @@ export async function listEntries(filters: { startDate?: string; endDate?: strin
 }
 
 export async function updateEntry(id: string, input: EntryInput, performedBy: string) {
-  await validateCapacity(input);
+  const capacity = await validateCapacity(input);
   const previous = await prisma.productionEntry.findUnique({ where: { id }, include: { damageEntries: true } });
   if (!previous) throw notFound("Entry not found");
   if (previous.deletedAt) throw notFound("Entry has been archived");
@@ -110,7 +119,7 @@ export async function updateEntry(id: string, input: EntryInput, performedBy: st
   const activeDamageTotal = previous.damageEntries
     .filter((damage) => !damage.deletedAt)
     .reduce((total, damage) => total + damage.amount, 0);
-  if (input.quantityProduced < activeDamageTotal) {
+  if (capacity.quantityProduced < activeDamageTotal) {
     throw new AppError(`Quantity cannot be less than active damages (${activeDamageTotal}).`, 400);
   }
 
@@ -124,6 +133,7 @@ export async function updateEntry(id: string, input: EntryInput, performedBy: st
     where: { id },
     data: {
       ...input,
+      quantityProduced: capacity.quantityProduced,
       date: new Date(input.date),
       batchNumber,
       notes: input.notes?.trim() || null

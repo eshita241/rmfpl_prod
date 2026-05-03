@@ -99,6 +99,12 @@ Backend: `http://localhost:5000`
 
 ## Docker Usage
 
+Optional: create a root `.env` from the example if you want to override Docker values:
+
+```bash
+cp .env.example .env
+```
+
 ```bash
 docker compose up --build
 ```

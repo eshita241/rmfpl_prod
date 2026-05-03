@@ -1,13 +1,18 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RotateCcw, Save } from "lucide-react";
+import { Save } from "lucide-react";
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
-import { createEntry, getCompanies, getSkus } from "../api/queries";
+import { createEntry, getCompanies, getNextBatch, getSkus } from "../api/queries";
 import type { Company, Sku } from "../types/domain";
 import { ApiError } from "../api/client";
 
-const today = new Date().toISOString().slice(0, 10);
+function localToday() {
+  const now = new Date();
+  const offset = now.getTimezoneOffset();
+  return new Date(now.getTime() - offset * 60_000).toISOString().slice(0, 10);
+}
+const today = localToday();
 const shifts = ["Morning", "Evening", "Night"];
 
 type FormState = {
@@ -15,7 +20,6 @@ type FormState = {
   shift: string;
   companyId: string;
   skuId: string;
-  quantityProduced: string;
   mouldsUsed: string;
   emptySlotsPerMould: string;
   notes: string;
@@ -26,7 +30,6 @@ const initialForm: FormState = {
   shift: "Morning",
   companyId: "",
   skuId: "",
-  quantityProduced: "",
   mouldsUsed: "",
   emptySlotsPerMould: "0",
   notes: ""
@@ -35,8 +38,7 @@ const initialForm: FormState = {
 export function NewEntry() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<FormState>(() => {
-    const last = localStorage.getItem("last-entry-form");
-    return last ? { ...initialForm, ...JSON.parse(last), date: today } : initialForm;
+    return initialForm;
   });
   const [message, setMessage] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -45,15 +47,21 @@ export function NewEntry() {
   const skus = useQuery({ queryKey: ["skus", form.companyId], queryFn: () => getSkus(form.companyId), enabled: Boolean(form.companyId) });
   const selectedSku = useMemo(() => skus.data?.find((sku) => sku.id === form.skuId), [skus.data, form.skuId]);
   const totalCapacity = selectedSku ? Number(form.mouldsUsed || 0) * selectedSku.mouldCapacity : 0;
-  const exceedsCapacity = selectedSku && Number(form.quantityProduced || 0) > totalCapacity;
+  const quantityProduced = selectedSku
+    ? Math.max(Number(form.mouldsUsed || 0) * (selectedSku.mouldCapacity - Number(form.emptySlotsPerMould || 0)), 0)
+    : 0;
+  const nextBatch = useQuery({
+    queryKey: ["next-batch", form.date, form.skuId],
+    queryFn: () => getNextBatch(form.date, form.skuId),
+    enabled: Boolean(form.date && form.skuId)
+  });
 
   const mutation = useMutation({
     mutationFn: createEntry,
     onSuccess: () => {
-      localStorage.setItem("last-entry-form", JSON.stringify({ ...form, quantityProduced: "" }));
       setMessage("Entry saved.");
       setErrors({});
-      setForm((current) => ({ ...current, quantityProduced: "" }));
+      setForm((current) => ({ ...current, mouldsUsed: "", emptySlotsPerMould: "0", notes: "" }));
       queryClient.invalidateQueries({ queryKey: ["logs"] });
       queryClient.invalidateQueries({ queryKey: ["entries"] });
     },
@@ -70,16 +78,10 @@ export function NewEntry() {
     setErrors({});
     mutation.mutate({
       ...form,
-      quantityProduced: Number(form.quantityProduced),
       mouldsUsed: Number(form.mouldsUsed),
       emptySlotsPerMould: Number(form.emptySlotsPerMould),
       notes: form.notes
     });
-  }
-
-  function repeatLastEntry() {
-    const last = localStorage.getItem("last-entry-form");
-    if (last) setForm({ ...initialForm, ...JSON.parse(last), date: today });
   }
 
   return (
@@ -89,9 +91,6 @@ export function NewEntry() {
           <h2 className="text-2xl font-bold text-ink">New Production Entry</h2>
           <p className="text-ink/65">Large controls, defaults, and checks for quick shop-floor entry.</p>
         </div>
-        <Button onClick={repeatLastEntry}>
-          <span className="inline-flex items-center gap-2"><RotateCcw size={20} /> Repeat Last Entry</span>
-        </Button>
       </div>
 
       <section className="grid gap-4 md:grid-cols-3">
@@ -118,7 +117,7 @@ export function NewEntry() {
               className={`min-h-24 rounded-md border p-4 text-left ${form.skuId === sku.id ? "border-brand bg-brand text-white" : "border-line bg-field text-ink"}`}
             >
               <span className="block text-lg font-bold">{sku.name}</span>
-              <span className="mt-1 block text-sm opacity-80">{sku.weight}g | {sku.mouldCapacity} per mould</span>
+              <span className="mt-1 block text-sm opacity-80">{sku.weight} g per piece | {sku.mouldCapacity} pieces per mould</span>
             </button>
           ))}
         </div>
@@ -149,12 +148,18 @@ export function NewEntry() {
       </section>
 
       <section>
-        <Field label="Quantity Produced" type="number" inputMode="numeric" error={errors.quantityProduced} value={form.quantityProduced} onChange={(e) => setForm({ ...form, quantityProduced: e.target.value })} />
+        <div className="rounded-md border border-line bg-milk p-4">
+          <span className="block text-sm font-semibold text-ink/65">Calculated Quantity Produced</span>
+          <strong className="mt-1 block text-3xl text-ink">{quantityProduced} pieces</strong>
+          <span className="mt-1 block text-sm text-ink/65">
+            Batch {nextBatch.data?.batchNumber ?? "-"} | {selectedSku ? `${selectedSku.weight} g per piece` : "Select SKU for weight"}
+          </span>
+        </div>
       </section>
 
       {selectedSku ? (
-        <div className={`rounded-md border p-4 font-semibold ${exceedsCapacity ? "border-red-300 bg-red-50 text-red-800" : "border-line bg-field text-ink"}`}>
-          Total capacity: {totalCapacity}. {exceedsCapacity ? "Production is above capacity. Please check quantity or moulds." : "Capacity looks fine."}
+        <div className="rounded-md border border-line bg-field p-4 font-semibold text-ink">
+          Total capacity: {totalCapacity} pieces. Quantity = moulds used x (pieces per mould - empty slots per mould).
         </div>
       ) : null}
 

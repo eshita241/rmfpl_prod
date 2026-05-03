@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Archive, Download, Pencil } from "lucide-react";
 import { useState } from "react";
 import { downloadUrl } from "../api/client";
-import { deleteEntry, getEntries, updateEntry } from "../api/queries";
+import { deleteEntry, getCompanies, getEntries, getSkus, updateEntry } from "../api/queries";
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
 import type { ProductionEntry } from "../types/domain";
@@ -12,9 +12,12 @@ export function Reports({ isAdmin }: { isAdmin: boolean }) {
   const queryClient = useQueryClient();
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10));
+  const [filters, setFilters] = useState({ companyId: "", skuId: "", shift: "" });
   const [entryToEdit, setEntryToEdit] = useState<ProductionEntry | null>(null);
   const [entryToArchive, setEntryToArchive] = useState<ProductionEntry | null>(null);
-  const entries = useQuery({ queryKey: ["entries", startDate, endDate], queryFn: () => getEntries(startDate, endDate) });
+  const companies = useQuery({ queryKey: ["companies"], queryFn: getCompanies });
+  const skus = useQuery({ queryKey: ["skus", filters.companyId], queryFn: () => getSkus(filters.companyId || undefined) });
+  const entries = useQuery({ queryKey: ["entries", startDate, endDate, filters], queryFn: () => getEntries(startDate, endDate, filters) });
   const editMutation = useMutation({
     mutationFn: (body: ReturnType<typeof entryPayload>) => updateEntry(body.id, body.payload),
     onSuccess: () => {
@@ -33,7 +36,11 @@ export function Reports({ isAdmin }: { isAdmin: boolean }) {
   });
 
   function download(format: "excel" | "pdf") {
-    window.location.href = downloadUrl(`/reports?startDate=${startDate}&endDate=${endDate}&format=${format}`);
+    const params = new URLSearchParams({ startDate, endDate, format });
+    if (filters.companyId) params.set("companyId", filters.companyId);
+    if (filters.skuId) params.set("skuId", filters.skuId);
+    if (filters.shift) params.set("shift", filters.shift);
+    window.location.href = downloadUrl(`/reports?${params.toString()}`);
   }
 
   return (
@@ -44,6 +51,26 @@ export function Reports({ isAdmin }: { isAdmin: boolean }) {
         <Field label="End Date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
         <Button className="self-end" tone="primary" onClick={() => download("excel")}><span className="inline-flex items-center gap-2"><Download size={20} /> Excel</span></Button>
         <Button className="self-end" onClick={() => download("pdf")}><span className="inline-flex items-center gap-2"><Download size={20} /> PDF</span></Button>
+      </section>
+      <section className="rounded-md border border-line bg-field p-4">
+        <div className="grid gap-2 md:grid-cols-4">
+          <Button active={!filters.shift} onClick={() => setFilters({ ...filters, shift: "" })}>All Shifts</Button>
+          {["Morning", "Evening", "Night"].map((shift) => (
+            <Button key={shift} active={filters.shift === shift} onClick={() => setFilters({ ...filters, shift })}>{shift}</Button>
+          ))}
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-3">
+          <Button active={!filters.companyId} onClick={() => setFilters({ ...filters, companyId: "", skuId: "" })}>All Companies</Button>
+          {(companies.data ?? []).map((company) => (
+            <Button key={company.id} active={filters.companyId === company.id} onClick={() => setFilters({ ...filters, companyId: company.id, skuId: "" })}>{company.name}</Button>
+          ))}
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-3">
+          <Button active={!filters.skuId} onClick={() => setFilters({ ...filters, skuId: "" })}>All Variants</Button>
+          {(skus.data ?? []).map((sku) => (
+            <Button key={sku.id} active={filters.skuId === sku.id} onClick={() => setFilters({ ...filters, skuId: sku.id })}>{sku.name}</Button>
+          ))}
+        </div>
       </section>
       <div className="overflow-x-auto rounded-md border border-line bg-field">
         <table className="w-full min-w-[1100px] text-left">
@@ -180,7 +207,6 @@ function entryPayload(entry: ProductionEntry) {
       shift: entry.shift,
       companyId: entry.companyId,
       skuId: entry.skuId,
-      quantityProduced: entry.quantityProduced,
       mouldsUsed: entry.mouldsUsed,
       emptySlotsPerMould: entry.emptySlotsPerMould
       ,notes: entry.notes ?? ""

@@ -1,12 +1,13 @@
 import { AlertTriangle, ClipboardList, Download, Factory, FileText, ListChecks, LogOut, Menu, Shield, X } from "lucide-react";
-import { useState } from "react";
-import { downloadUrl } from "../api/client";
+import { useEffect, useState } from "react";
+import { promptInstall, subscribeInstallPrompt } from "../pwa";
 import { Button } from "./Button";
 
-export type AppTab = "entry" | "damages" | "reports" | "logs" | "admin";
+export type AppTab = "entry" | "production" | "damages" | "reports" | "logs" | "admin";
 
 const navItems = [
   { id: "entry" as const, label: "New Entry", icon: ClipboardList, show: true },
+  { id: "production" as const, label: "Production Entries", icon: ClipboardList, show: true },
   { id: "damages" as const, label: "Damages", icon: AlertTriangle, show: true },
   { id: "reports" as const, label: "Reports", icon: FileText, show: true },
   { id: "logs" as const, label: "Logs", icon: ListChecks, show: true },
@@ -29,6 +30,14 @@ export function Sidebar({
   onLogout: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [canInstall, setCanInstall] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = subscribeInstallPrompt((event) => setCanInstall(Boolean(event)));
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   const content = (
     <aside className="flex h-full w-72 flex-col border-r border-line bg-[#f1faed] text-ink">
@@ -67,8 +76,8 @@ export function Sidebar({
       </nav>
 
       <div className="space-y-2 border-t border-line p-3">
-        <Button className="w-full justify-start" onClick={() => (window.location.href = downloadUrl("/download-app"))}>
-          <span className="inline-flex items-center gap-2"><Download size={18} /> Download App</span>
+        <Button className="w-full justify-start" disabled={!canInstall} onClick={() => promptInstall()}>
+          <span className="inline-flex items-center gap-2"><Download size={18} /> Install App</span>
         </Button>
         <Button className="w-full justify-start" onClick={onLogout}>
           <span className="inline-flex items-center gap-2"><LogOut size={18} /> Sign Out</span>

@@ -1,0 +1,19 @@
+{
+  "name": "RMFPL Management",
+  "short_name": "RMFPL",
+  "description": "Production, damage, reporting, and audit management for RMFPL.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7fbf4",
+  "theme_color": "#1b8a5a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

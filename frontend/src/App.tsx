@@ -7,6 +7,7 @@ import { Damages } from "./pages/Damages";
 import { Logs } from "./pages/Logs";
 import { Login } from "./pages/Login";
 import { NewEntry } from "./pages/NewEntry";
+import { ProductionEntries } from "./pages/ProductionEntries";
 import { Reports } from "./pages/Reports";
 
 export function App() {
@@ -30,7 +31,7 @@ export function App() {
 
   const isAdmin = me.data.user.role === "ADMIN";
   const content =
-    tab === "entry" ? <NewEntry /> : tab === "damages" ? <Damages isAdmin={isAdmin} /> : tab === "reports" ? <Reports isAdmin={isAdmin} /> : tab === "logs" ? <Logs /> : <Admin />;
+    tab === "entry" ? <NewEntry /> : tab === "production" ? <ProductionEntries /> : tab === "damages" ? <Damages isAdmin={isAdmin} /> : tab === "reports" ? <Reports isAdmin={isAdmin} /> : tab === "logs" ? <Logs /> : <Admin />;
 
   return (
     <main className="min-h-screen bg-paper text-ink">
@@ -53,5 +54,5 @@ export function App() {
 
 function tabFromHash(): AppTab {
   const hash = window.location.hash.replace("#", "");
-  return ["entry", "damages", "reports", "logs", "admin"].includes(hash) ? (hash as AppTab) : "entry";
+  return ["entry", "production", "damages", "reports", "logs", "admin"].includes(hash) ? (hash as AppTab) : "entry";
 }

@@ -17,13 +17,6 @@ const companies = [
       { name: "Cheese Block 250g", weight: 250, mouldCapacity: 100 },
       { name: "Curd Cup 100g", weight: 100, mouldCapacity: 160 }
     ]
-  },
-  {
-    name: "India Dairy",
-    skus: [
-      { name: "Butter 100g", weight: 100, mouldCapacity: 140 },
-      { name: "Ghee Tin 1kg", weight: 1000, mouldCapacity: 50 }
-    ]
   }
 ];
 
