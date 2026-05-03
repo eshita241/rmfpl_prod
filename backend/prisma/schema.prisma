@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum ActionType {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+enum LogEntity {
+  SKU
+  ENTRY
+  DAMAGE
+  USER_ROLE
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  passwordHash String?
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+
+  entries ProductionEntry[] @relation("EntryCreator")
+  damages DamageEntry[]     @relation("DamageCreator")
+  logs    Log[]             @relation("LogPerformer")
+}
+
+model Company {
+  id   String @id @default(cuid())
+  name String @unique
+
+  skus    SKU[]
+  entries ProductionEntry[]
+  damageEntries DamageEntry[]
+}
+
+model SKU {
+  id             String   @id @default(cuid())
+  name           String
+  companyId      String
+  weight         Float
+  mouldCapacity  Int
+  createdAt      DateTime @default(now())
+  deletedAt      DateTime?
+
+  company Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  entries ProductionEntry[]
+  damageEntries DamageEntry[]
+
+  @@unique([name, companyId])
+}
+
+model ProductionEntry {
+  id                 String   @id @default(cuid())
+  date               DateTime
+  shift              String
+  batchNumber        Int      @default(1)
+  companyId          String
+  skuId              String
+  quantityProduced   Int
+  mouldsUsed         Int
+  emptySlotsPerMould Int
+  notes              String?
+  damages            Int      @default(0)
+  damageReason       String?
+  createdBy          String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  deletedAt          DateTime?
+
+  company Company @relation(fields: [companyId], references: [id])
+  sku     SKU     @relation(fields: [skuId], references: [id])
+  creator User    @relation("EntryCreator", fields: [createdBy], references: [id])
+  damageEntries DamageEntry[]
+}
+
+model DamageEntry {
+  id        String   @id @default(cuid())
+  date      DateTime
+  batch     String?
+  productionEntryId String?
+  companyId String
+  skuId     String
+  amount    Int
+  reason    String
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  productionEntry ProductionEntry? @relation(fields: [productionEntryId], references: [id])
+  company Company @relation(fields: [companyId], references: [id])
+  sku     SKU     @relation(fields: [skuId], references: [id])
+  creator User    @relation("DamageCreator", fields: [createdBy], references: [id])
+}
+
+model Log {
+  id          String     @id @default(cuid())
+  actionType  ActionType
+  entity      LogEntity
+  entityId    String
+  changes     Json
+  performedBy String
+  timestamp   DateTime   @default(now())
+
+  performer User @relation("LogPerformer", fields: [performedBy], references: [id])
+}
