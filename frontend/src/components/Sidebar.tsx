@@ -40,7 +40,7 @@ export function Sidebar({
   }, []);
 
   const content = (
-    <aside className="flex h-full w-72 flex-col border-r border-line bg-[#f1faed] text-ink">
+    <aside className="flex h-full w-[min(18rem,calc(100vw-3rem))] flex-col border-r border-line bg-[#f1faed] text-ink">
       <div className="flex items-center gap-3 border-b border-line p-5">
         <div className="grid h-12 w-12 place-items-center rounded-md bg-brand text-white shadow-sm">
           <Factory size={28} />

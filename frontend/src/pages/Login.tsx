@@ -23,15 +23,15 @@ export function Login() {
   });
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-paper p-6">
-      <section className="w-full max-w-md rounded-md border border-line bg-field p-8 shadow-sm">
+    <main className="flex min-h-screen items-center justify-center bg-paper p-3 sm:p-6">
+      <section className="w-full max-w-md rounded-md border border-line bg-field p-5 shadow-sm sm:p-8">
         <Factory className="mb-5 text-brand" size={42} />
         <h1 className="text-3xl font-bold text-ink">RMFPL_MGMT</h1>
         <p className="mt-3 text-base leading-7 text-ink/70">
           Sign in with email and password to record production, view logs, and download reports.
         </p>
 
-        <div className="mt-6 grid grid-cols-2 gap-2">
+        <div className="mt-6 grid gap-2 sm:grid-cols-2">
           <Button active={mode === "login"} onClick={() => setMode("login")}>Login</Button>
           <Button active={mode === "signup"} onClick={() => setMode("signup")}>Create User</Button>
         </div>

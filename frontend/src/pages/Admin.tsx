@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createSku, deleteSku, getCompanies, getSkus, getUsers, updateSku, updateUserRole } from "../api/queries";
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
+import { Modal } from "../components/Modal";
 import { SelectField } from "../components/SelectField";
 
 export function Admin() {
@@ -90,7 +91,7 @@ export function Admin() {
                   ...(companies.data ?? []).map((company) => ({ label: company.name, value: company.id }))
                 ]}
               />
-              <Button className="self-end" tone="primary" disabled={!skuForm.name || !skuForm.companyId || !skuForm.weight || !skuForm.mouldCapacity} onClick={() => skuMutation.mutate(skuForm)}>
+              <Button className="w-full self-end md:w-auto" tone="primary" disabled={!skuForm.name || !skuForm.companyId || !skuForm.weight || !skuForm.mouldCapacity} onClick={() => skuMutation.mutate(skuForm)}>
                 Add SKU
               </Button>
             </div>
@@ -99,14 +100,14 @@ export function Admin() {
 
         <div className="mt-3 grid gap-3 md:grid-cols-2">
           {(skus.data ?? []).map((sku) => (
-            <div key={sku.id} className={`flex items-center justify-between gap-3 rounded-md border border-line p-3 ${sku.deletedAt ? "bg-slate-100 opacity-70" : "bg-milk"}`}>
-              <span>
+            <div key={sku.id} className={`flex flex-col gap-3 rounded-md border border-line p-3 sm:flex-row sm:items-center sm:justify-between ${sku.deletedAt ? "bg-slate-100 opacity-70" : "bg-milk"}`}>
+              <span className="min-w-0">
                 <strong>{sku.name}</strong>
                 {sku.deletedAt ? <span className="ml-2 rounded-md bg-slate-200 px-2 py-1 text-xs font-bold text-slate-700">Archived</span> : null}
                 <br />
                 <small>{sku.company?.name} | {sku.weight}g | {sku.mouldCapacity}</small>
               </span>
-              <div className="flex gap-2">
+              <div className="flex gap-2 sm:shrink-0">
                 <Button
                   disabled={Boolean(sku.deletedAt)}
                   onClick={() => {
@@ -130,17 +131,19 @@ export function Admin() {
       </section>
 
       {editingSkuId ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-ink/50 p-4">
-          <section className="w-full max-w-2xl rounded-md border border-line bg-field p-5 shadow-xl">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-ink">Edit SKU</h3>
-                <p className="text-sm text-ink/60">Review and update SKU details.</p>
-              </div>
-              <Button onClick={resetSkuForm}>
-                <span className="inline-flex items-center gap-2"><X size={18} /> Close</span>
+        <Modal
+          title="Edit SKU"
+          description="Review and update SKU details."
+          maxWidth="md"
+          actions={
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Button onClick={resetSkuForm}>Cancel</Button>
+              <Button tone="primary" disabled={!skuForm.name || !skuForm.companyId || !skuForm.weight || !skuForm.mouldCapacity || skuMutation.isPending} onClick={() => skuMutation.mutate(skuForm)}>
+                Save SKU
               </Button>
             </div>
+          }
+        >
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <Field label="SKU Name" value={skuForm.name} onChange={(e) => setSkuForm({ ...skuForm, name: e.target.value })} />
               <Field label="Weight" type="number" value={skuForm.weight} onChange={(e) => setSkuForm({ ...skuForm, weight: e.target.value })} />
@@ -155,22 +158,15 @@ export function Admin() {
                 ]}
               />
             </div>
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              <Button onClick={resetSkuForm}>Cancel</Button>
-              <Button tone="primary" disabled={!skuForm.name || !skuForm.companyId || !skuForm.weight || !skuForm.mouldCapacity || skuMutation.isPending} onClick={() => skuMutation.mutate(skuForm)}>
-                Save SKU
-              </Button>
-            </div>
-          </section>
-        </div>
+        </Modal>
       ) : null}
 
       <section className="rounded-md border border-line bg-field p-4">
         <h3 className="text-lg font-bold text-ink">Users</h3>
         <div className="mt-3 space-y-3">
           {(users.data ?? []).map((user) => (
-            <div key={user.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line p-3">
-              <span><strong>{user.name}</strong><br /><small>{user.email}</small></span>
+            <div key={user.id} className="flex flex-col gap-3 rounded-md border border-line p-3 sm:flex-row sm:items-center sm:justify-between">
+              <span className="min-w-0"><strong>{user.name}</strong><br /><small className="break-all">{user.email}</small></span>
               <SelectField
                 label="Role"
                 value={user.role}
@@ -179,7 +175,7 @@ export function Admin() {
                   { label: "USER", value: "USER" },
                   { label: "ADMIN", value: "ADMIN" }
                 ]}
-                className="min-w-40"
+                className="w-full sm:w-40"
               />
             </div>
           ))}
@@ -187,20 +183,23 @@ export function Admin() {
       </section>
 
       {skuToDelete ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-ink/50 p-4">
-          <section className="w-full max-w-md rounded-md border border-line bg-field p-5 shadow-xl">
-            <h3 className="text-xl font-bold text-ink">Archive SKU?</h3>
-            <p className="mt-3 text-ink/75">
+        <Modal
+          title="Archive SKU?"
+          description={
+            <>
               This will archive <strong>{skuToDelete.name}</strong>{skuToDelete.company ? ` from ${skuToDelete.company}` : ""}. It will be hidden from new entries, but old production history and reports will stay safe.
-            </p>
-            <div className="mt-5 grid grid-cols-2 gap-3">
+            </>
+          }
+          icon={<Archive className="text-red-700" size={30} />}
+          actions={
+            <div className="grid gap-3 sm:grid-cols-2">
               <Button onClick={() => setSkuToDelete(null)}>Cancel</Button>
               <Button tone="danger" disabled={deleteMutation.isPending} onClick={() => deleteMutation.mutate(skuToDelete.id)}>
                 Yes, Archive
               </Button>
             </div>
-          </section>
-        </div>
+          }
+        />
       ) : null}
     </div>
   );

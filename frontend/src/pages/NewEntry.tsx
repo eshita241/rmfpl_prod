@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, ClipboardList, Save } from "lucide-react";
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
+import { Modal } from "../components/Modal";
 import { SelectField } from "../components/SelectField";
 import { createEntry, getCompanies, getNextBatch, getSkus } from "../api/queries";
 import { ApiError } from "../api/client";
@@ -165,7 +166,7 @@ export function NewEntry() {
       <section>
         <div className="rounded-md border border-line bg-milk p-4">
           <span className="block text-sm font-semibold text-ink/65">Calculated Quantity Produced</span>
-          <strong className="mt-1 block text-3xl text-ink">{quantityProduced} pieces</strong>
+          <strong className="mt-1 block text-2xl text-ink sm:text-3xl">{quantityProduced} pieces</strong>
           <span className="mt-1 block text-sm text-ink/65">
             Batch {nextBatch.data?.batchNumber ?? "-"} | {selectedSku ? `${selectedSku.weight} g per piece` : "Select SKU for weight"}
           </span>
@@ -184,38 +185,12 @@ export function NewEntry() {
       </Button>
 
       {savedEntry ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-ink/50 p-4">
-          <section className="w-full max-w-md rounded-md border border-line bg-field p-5 shadow-xl">
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="mt-1 shrink-0 text-brand" size={30} />
-              <div>
-                <h3 className="text-xl font-bold text-ink">Production Entry Saved</h3>
-                <p className="mt-2 text-ink/70">The form has been cleared to avoid accidental duplicate entry.</p>
-              </div>
-            </div>
-            <dl className="mt-5 grid gap-3 rounded-md border border-line bg-milk p-4 text-sm">
-              <div className="flex justify-between gap-4">
-                <dt className="font-semibold text-ink/65">Date</dt>
-                <dd className="font-bold text-ink">{savedEntry.date}</dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt className="font-semibold text-ink/65">Batch</dt>
-                <dd className="font-bold text-ink">Batch {savedEntry.batchNumber}</dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt className="font-semibold text-ink/65">SKU</dt>
-                <dd className="text-right font-bold text-ink">{savedEntry.skuName}</dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt className="font-semibold text-ink/65">Company</dt>
-                <dd className="text-right font-bold text-ink">{savedEntry.companyName}</dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt className="font-semibold text-ink/65">Quantity</dt>
-                <dd className="font-bold text-ink">{savedEntry.quantityProduced} pieces</dd>
-              </div>
-            </dl>
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <Modal
+          title="Production Entry Saved"
+          description="The form has been cleared to avoid accidental duplicate entry."
+          icon={<CheckCircle2 className="text-brand" size={30} />}
+          actions={
+            <div className="grid gap-3 sm:grid-cols-2">
               <Button tone="primary" onClick={() => setSavedEntry(null)}>Done</Button>
               <Button
                 onClick={() => {
@@ -226,8 +201,31 @@ export function NewEntry() {
                 <span className="inline-flex items-center gap-2"><ClipboardList size={18} /> View Production Entries</span>
               </Button>
             </div>
-          </section>
-        </div>
+          }
+        >
+          <dl className="grid gap-3 rounded-md border border-line bg-milk p-4 text-sm">
+            <div className="flex justify-between gap-4">
+              <dt className="font-semibold text-ink/65">Date</dt>
+              <dd className="font-bold text-ink">{savedEntry.date}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="font-semibold text-ink/65">Batch</dt>
+              <dd className="font-bold text-ink">Batch {savedEntry.batchNumber}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="font-semibold text-ink/65">SKU</dt>
+              <dd className="text-right font-bold text-ink">{savedEntry.skuName}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="font-semibold text-ink/65">Company</dt>
+              <dd className="text-right font-bold text-ink">{savedEntry.companyName}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="font-semibold text-ink/65">Quantity</dt>
+              <dd className="font-bold text-ink">{savedEntry.quantityProduced} pieces</dd>
+            </div>
+          </dl>
+        </Modal>
       ) : null}
     </div>
   );

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { getLogs } from "../api/queries";
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
+import { Modal } from "../components/Modal";
 import type { Log } from "../types/domain";
 import { localDateInputValue } from "../utils/date";
 import { formatIst } from "../utils/time";
@@ -62,21 +63,17 @@ export function Logs() {
       </div>
 
       {selectedLog ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-ink/50 p-4">
-          <section className="w-full max-w-3xl rounded-md border border-line bg-field p-5 shadow-xl">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-ink">{selectedLog.actionType} {selectedLog.entity}</h3>
-                <p className="text-sm text-ink/65">{formatIst(selectedLog.timestamp)}</p>
-              </div>
-              <Button onClick={() => setSelectedLog(null)}>Close</Button>
-            </div>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <Modal
+          title={`${selectedLog.actionType} ${selectedLog.entity}`}
+          description={formatIst(selectedLog.timestamp)}
+          maxWidth="lg"
+          actions={<Button className="w-full" tone="primary" onClick={() => setSelectedLog(null)}>Close</Button>}
+        >
+            <div className="grid gap-4 md:grid-cols-2">
               <DetailBlock title="Previous" value={hideShift(selectedLog.changes.previousValues)} />
               <DetailBlock title="New" value={hideShift(selectedLog.changes.newValues)} />
             </div>
-          </section>
-        </div>
+        </Modal>
       ) : null}
     </div>
   );
@@ -138,7 +135,7 @@ function hideShift(value: unknown): unknown {
 
 function DetailBlock({ title, value }: { title: string; value: unknown }) {
   return (
-    <div>
+    <div className="min-w-0">
       <h4 className="mb-2 font-bold text-ink">{title}</h4>
       <pre className="max-h-96 overflow-auto rounded-md bg-paper p-3 text-xs text-ink">
         {value ? JSON.stringify(value, null, 2) : "-"}

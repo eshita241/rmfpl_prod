@@ -4,6 +4,17 @@ import { listCompanies } from "../services/companyService.js";
 import { listLogs } from "../services/logService.js";
 import { buildExcelReport, buildPdfReport } from "../services/reportService.js";
 
+function reportFileName(query: { startDate?: string; endDate?: string }, extension: "xlsx" | "pdf") {
+  const datePart =
+    query.startDate && query.endDate
+      ? query.startDate === query.endDate
+        ? query.startDate
+        : `${query.startDate}_to_${query.endDate}`
+      : query.startDate ?? query.endDate ?? "all_dates";
+
+  return `${datePart}_Bread_production.${extension}`;
+}
+
 export async function getCompanies(_req: Request, res: Response) {
   res.json(await listCompanies());
 }
@@ -35,12 +46,12 @@ export async function getReport(req: Request, res: Response) {
   if (query.format === "pdf") {
     const pdf = await buildPdfReport(query);
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", "attachment; filename=production-report.pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=${reportFileName(query, "pdf")}`);
     return res.send(pdf);
   }
 
   const excel = await buildExcelReport(query);
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-  res.setHeader("Content-Disposition", "attachment; filename=production-report.xlsx");
+  res.setHeader("Content-Disposition", `attachment; filename=${reportFileName(query, "xlsx")}`);
   return res.send(Buffer.from(excel));
 }

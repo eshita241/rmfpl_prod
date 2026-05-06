@@ -47,7 +47,7 @@ export function App() {
           window.location.reload();
         }}
       />
-      <section className="mx-auto max-w-6xl p-4 pt-20 md:ml-72 md:p-8">{content}</section>
+      <section className="mx-auto max-w-6xl px-3 py-4 pt-20 sm:px-4 md:ml-72 md:p-8">{content}</section>
     </main>
   );
 }

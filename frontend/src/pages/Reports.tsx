@@ -5,6 +5,7 @@ import { downloadUrl } from "../api/client";
 import { deleteEntry, getCompanies, getEntries, getSkus, updateEntry } from "../api/queries";
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
+import { Modal } from "../components/Modal";
 import { SelectField } from "../components/SelectField";
 import type { ProductionEntry } from "../types/domain";
 import { currentWeekRange, localDateInputValue } from "../utils/date";
@@ -155,26 +156,26 @@ export function Reports({ isAdmin }: { isAdmin: boolean }) {
       ) : null}
 
       {entryToArchive ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-ink/50 p-4">
-          <section className="w-full max-w-md rounded-md border border-line bg-field p-5 shadow-xl">
-            <h3 className="text-xl font-bold text-ink">Archive Entry?</h3>
-            <p className="mt-3 text-ink/75">This hides the entry from reports and new damage selection. Audit history stays intact.</p>
-            <div className="mt-5 grid grid-cols-2 gap-3">
+        <Modal
+          title="Archive Entry?"
+          description="This hides the entry from reports and new damage selection. Audit history stays intact."
+          icon={<Archive className="text-red-700" size={30} />}
+          actions={
+            <div className="grid gap-3 sm:grid-cols-2">
               <Button onClick={() => setEntryToArchive(null)}>Cancel</Button>
               <Button tone="danger" disabled={archiveMutation.isPending} onClick={() => archiveMutation.mutate(entryToArchive.id)}>Archive</Button>
             </div>
-          </section>
-        </div>
+          }
+        />
       ) : null}
 
       {confirmDownload ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-ink/50 p-4">
-          <section className="w-full max-w-md rounded-md border border-line bg-field p-5 shadow-xl">
-            <h3 className="text-xl font-bold text-ink">Download Report?</h3>
-            <p className="mt-3 text-ink/75">
-              This will download a {downloadFormat === "excel" ? "Excel" : "PDF"} report from {startDate} to {endDate}.
-            </p>
-            <div className="mt-5 grid grid-cols-2 gap-3">
+        <Modal
+          title="Download Report?"
+          description={`This will download a ${downloadFormat === "excel" ? "Excel" : "PDF"} report from ${startDate} to ${endDate}.`}
+          icon={<Download className="text-brand" size={30} />}
+          actions={
+            <div className="grid gap-3 sm:grid-cols-2">
               <Button onClick={() => setConfirmDownload(false)}>Cancel</Button>
               <Button tone="primary" onClick={() => {
                 setConfirmDownload(false);
@@ -183,8 +184,8 @@ export function Reports({ isAdmin }: { isAdmin: boolean }) {
                 Download
               </Button>
             </div>
-          </section>
-        </div>
+          }
+        />
       ) : null}
     </div>
   );
@@ -252,10 +253,17 @@ function EntryEditor({
   const [draft, setDraft] = useState(entry);
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-ink/50 p-4">
-      <section className="w-full max-w-2xl rounded-md border border-line bg-field p-5 shadow-xl">
-        <h3 className="text-xl font-bold text-ink">Edit Production Entry</h3>
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
+    <Modal
+      title="Edit Production Entry"
+      maxWidth="md"
+      actions={
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Button onClick={onClose}>Cancel</Button>
+          <Button tone="primary" disabled={saving} onClick={() => onSave(draft)}>Save</Button>
+        </div>
+      }
+    >
+        <div className="grid gap-4 md:grid-cols-2">
           <Field label="Date" type="date" value={draft.date.slice(0, 10)} onChange={(e) => setDraft({ ...draft, date: e.target.value })} />
           <Field label="Quantity" type="number" value={String(draft.quantityProduced)} onChange={(e) => setDraft({ ...draft, quantityProduced: Number(e.target.value) })} />
           <Field label="Moulds Used" type="number" value={String(draft.mouldsUsed)} onChange={(e) => setDraft({ ...draft, mouldsUsed: Number(e.target.value) })} />
@@ -265,12 +273,7 @@ function EntryEditor({
           <span className="mb-2 block text-sm font-semibold text-ink">Notes</span>
           <textarea className="min-h-24 w-full rounded-md border border-line bg-field px-4 py-3 text-base" value={draft.notes ?? ""} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
         </label>
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          <Button onClick={onClose}>Cancel</Button>
-          <Button tone="primary" disabled={saving} onClick={() => onSave(draft)}>Save</Button>
-        </div>
-      </section>
-    </div>
+    </Modal>
   );
 }
 

@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Archive, Pencil, Save } from "lucide-react";
+import { AlertTriangle, Archive, CheckCircle2, Pencil, Save } from "lucide-react";
 import { createDamage, deleteDamage, getDamages, getEntries, updateDamage } from "../api/queries";
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
+import { Modal } from "../components/Modal";
 import { SelectField } from "../components/SelectField";
 import type { DamageEntry } from "../types/domain";
 import { formatIst } from "../utils/time";
@@ -11,6 +12,14 @@ import { ApiError } from "../api/client";
 import { localDateInputValue } from "../utils/date";
 
 const today = localDateInputValue();
+
+type SavedDamage = {
+  amount: number;
+  batch: string;
+  companyName: string;
+  skuName: string;
+  date: string;
+};
 
 export function Damages({ isAdmin }: { isAdmin: boolean }) {
   const queryClient = useQueryClient();
@@ -20,7 +29,7 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
     amount: "",
     reason: ""
   });
-  const [message, setMessage] = useState("");
+  const [savedDamage, setSavedDamage] = useState<SavedDamage | null>(null);
   const [errorModal, setErrorModal] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [damageToEdit, setDamageToEdit] = useState<DamageEntry | null>(null);
@@ -38,8 +47,14 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
 
   const mutation = useMutation({
     mutationFn: createDamage,
-    onSuccess: () => {
-      setMessage("Damage entry saved.");
+    onSuccess: (damage) => {
+      setSavedDamage({
+        amount: damage.amount,
+        batch: damageBatchLabel(damage),
+        companyName: damage.company.name,
+        skuName: damage.sku.name,
+        date: damage.date.slice(0, 10)
+      });
       setForm((current) => ({ ...current, amount: "", reason: "" }));
       queryClient.invalidateQueries({ queryKey: ["damages"] });
       queryClient.invalidateQueries({ queryKey: ["entries"] });
@@ -74,7 +89,6 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
   });
 
   function submit() {
-    setMessage("");
     setErrors({});
     const amount = Number(form.amount);
     const alreadyDamaged =
@@ -152,8 +166,6 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
           </div>
         ) : null}
 
-        {message ? <div className="mt-4 rounded-md border border-line bg-milk p-4 font-semibold text-ink">{message}</div> : null}
-
         <Button tone="primary" className="mt-5 w-full text-lg" disabled={mutation.isPending || !form.productionEntryId || !form.amount || !form.reason} onClick={submit}>
           <span className="inline-flex items-center gap-2"><Save size={22} /> Save Damage Entry</span>
         </Button>
@@ -183,69 +195,96 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
         </div>
       </section>
 
+      {savedDamage ? (
+        <Modal
+          title="Damage Entry Saved"
+          description="The damaged quantity has been recorded against the selected production batch."
+          icon={<CheckCircle2 className="text-brand" size={30} />}
+          actions={<Button className="w-full" tone="primary" onClick={() => setSavedDamage(null)}>Done</Button>}
+        >
+          <dl className="grid gap-3 rounded-md border border-line bg-milk p-4 text-sm">
+            <div className="flex justify-between gap-4">
+              <dt className="font-semibold text-ink/65">Date</dt>
+              <dd className="font-bold text-ink">{savedDamage.date}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="font-semibold text-ink/65">Batch</dt>
+              <dd className="font-bold text-ink">{savedDamage.batch}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="font-semibold text-ink/65">SKU</dt>
+              <dd className="text-right font-bold text-ink">{savedDamage.skuName}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="font-semibold text-ink/65">Company</dt>
+              <dd className="text-right font-bold text-ink">{savedDamage.companyName}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="font-semibold text-ink/65">Damaged</dt>
+              <dd className="font-bold text-ink">{savedDamage.amount} pieces</dd>
+            </div>
+          </dl>
+        </Modal>
+      ) : null}
+
       {errorModal ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-ink/50 p-4">
-          <section className="w-full max-w-md rounded-md border border-red-200 bg-field p-5 shadow-xl">
-            <h3 className="text-xl font-bold text-red-700">Check Damage Quantity</h3>
-            <p className="mt-3 text-ink/75">{errorModal}</p>
-            <Button className="mt-5 w-full" tone="primary" onClick={() => setErrorModal(null)}>
-              OK
-            </Button>
-          </section>
-        </div>
+        <Modal
+          title="Check Damage Quantity"
+          description={errorModal}
+          icon={<AlertTriangle className="text-red-700" size={30} />}
+          actions={<Button className="w-full" tone="primary" onClick={() => setErrorModal(null)}>OK</Button>}
+        />
       ) : null}
 
       {damageToArchive ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-ink/50 p-4">
-          <section className="w-full max-w-md rounded-md border border-line bg-field p-5 shadow-xl">
-            <h3 className="text-xl font-bold text-ink">Archive Damage Entry?</h3>
-            <p className="mt-3 text-ink/75">This hides the damage entry from active reports, while keeping audit history intact.</p>
-            <div className="mt-5 grid grid-cols-2 gap-3">
+        <Modal
+          title="Archive Damage Entry?"
+          description="This hides the damage entry from active reports, while keeping audit history intact."
+          icon={<Archive className="text-red-700" size={30} />}
+          actions={
+            <div className="grid gap-3 sm:grid-cols-2">
               <Button onClick={() => setDamageToArchive(null)}>Cancel</Button>
               <Button tone="danger" disabled={archiveMutation.isPending} onClick={() => archiveMutation.mutate(damageToArchive.id)}>Archive</Button>
             </div>
-          </section>
-        </div>
+          }
+        />
       ) : null}
 
       {damageToEdit ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-ink/50 p-4">
-          <section className="w-full max-w-3xl rounded-md border border-line bg-field p-5 shadow-xl">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-ink">Edit Damage Entry</h3>
-                <p className="text-sm text-ink/60">{damageToEdit.sku.name} | {damageToEdit.company.name} | {formatIst(damageToEdit.createdAt)}</p>
-              </div>
-              <Button onClick={() => setDamageToEdit(null)}>Close</Button>
-            </div>
-            <div className="mt-5 grid gap-5 md:grid-cols-2">
-              <Field label="Date" type="date" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} />
-              <Field label="Amount Damaged" type="number" inputMode="numeric" value={editForm.amount} onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })} />
-            </div>
-            <div className="mt-5">
-              <SelectField
-                label="Production Entry"
-                value={editForm.productionEntryId}
-                onChange={(e) => setEditForm({ ...editForm, productionEntryId: e.target.value })}
-                options={[
-                  { label: "Select production entry", value: "" },
-                  ...(editEntries.data ?? []).map((entry) => ({
-                    label: `${entry.sku.name} | Batch ${entry.batchNumber} | Produced ${entry.quantityProduced}`,
-                    value: entry.id
-                  }))
-                ]}
-              />
-            </div>
-            <label className="mt-5 block">
-              <span className="mb-2 block text-sm font-semibold text-ink">Notes</span>
-              <textarea className="min-h-28 w-full rounded-md border border-line bg-field px-4 py-3 text-lg outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" value={editForm.reason} onChange={(e) => setEditForm({ ...editForm, reason: e.target.value })} />
-            </label>
-            <div className="mt-5 grid grid-cols-2 gap-3">
+        <Modal
+          title="Edit Damage Entry"
+          description={`${damageToEdit.sku.name} | ${damageToEdit.company.name} | ${formatIst(damageToEdit.createdAt)}`}
+          maxWidth="lg"
+          actions={
+            <div className="grid gap-3 sm:grid-cols-2">
               <Button onClick={() => setDamageToEdit(null)}>Cancel</Button>
               <Button tone="primary" disabled={editMutation.isPending || !editForm.productionEntryId || !editForm.amount || !editForm.reason} onClick={() => editMutation.mutate({ ...editForm, amount: Number(editForm.amount) })}>Save Changes</Button>
             </div>
-          </section>
-        </div>
+          }
+        >
+          <div className="grid gap-5 md:grid-cols-2">
+            <Field label="Date" type="date" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} />
+            <Field label="Amount Damaged" type="number" inputMode="numeric" value={editForm.amount} onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })} />
+          </div>
+          <div className="mt-5">
+            <SelectField
+              label="Production Entry"
+              value={editForm.productionEntryId}
+              onChange={(e) => setEditForm({ ...editForm, productionEntryId: e.target.value })}
+              options={[
+                { label: "Select production entry", value: "" },
+                ...(editEntries.data ?? []).map((entry) => ({
+                  label: `${entry.sku.name} | Batch ${entry.batchNumber} | Produced ${entry.quantityProduced}`,
+                  value: entry.id
+                }))
+              ]}
+            />
+          </div>
+          <label className="mt-5 block">
+            <span className="mb-2 block text-sm font-semibold text-ink">Notes</span>
+            <textarea className="min-h-28 w-full rounded-md border border-line bg-field px-4 py-3 text-lg outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" value={editForm.reason} onChange={(e) => setEditForm({ ...editForm, reason: e.target.value })} />
+          </label>
+        </Modal>
       ) : null}
     </div>
   );

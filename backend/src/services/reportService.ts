@@ -23,12 +23,40 @@ type ReportRow = {
   entriesBySku: Map<string, ReportEntry>;
 };
 
+function damageQuantity(entry: ReportEntry) {
+  const linkedDamages = entry.damageEntries ?? [];
+  return linkedDamages.length > 0
+    ? linkedDamages.reduce((total, damage) => total + damage.amount, 0)
+    : entry.damages;
+}
+
 function isDateRange(filters: ReportFilters) {
   return !filters.startDate || !filters.endDate || filters.startDate !== filters.endDate;
 }
 
 function reportDate(entry: ReportEntry) {
   return entry.date.toISOString().slice(0, 10);
+}
+
+function groupRowsByDate(rows: ReportRow[]) {
+  const groups = new Map<string, ReportRow[]>();
+  rows.forEach((row) => {
+    const dateRows = groups.get(row.date) ?? [];
+    dateRows.push(row);
+    groups.set(row.date, dateRows);
+  });
+  return Array.from(groups.entries());
+}
+
+function totalQuantity(rows: ReportRow[], skuId: string) {
+  return rows.reduce((total, row) => total + (row.entriesBySku.get(skuId)?.quantityProduced ?? 0), 0);
+}
+
+function totalDamages(rows: ReportRow[], skuId: string) {
+  return rows.reduce((total, row) => {
+    const entry = row.entriesBySku.get(skuId);
+    return total + (entry ? damageQuantity(entry) : 0);
+  }, 0);
 }
 
 function buildWideReport(entries: ReportEntry[]) {
@@ -66,12 +94,34 @@ function buildWideReport(entries: ReportEntry[]) {
   return { skus, rows };
 }
 
+function styleSummaryRow(row: ExcelJS.Row, lastColumn: number, fillColor: string) {
+  row.font = { bold: true, color: { argb: "FF000000" } };
+  row.alignment = { horizontal: "center", vertical: "middle" };
+  row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+    if (colNumber <= lastColumn) {
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: fillColor }
+      };
+      cell.border = {
+        top: { style: "thin", color: { argb: "FF000000" } },
+        left: { style: "thin", color: { argb: "FF000000" } },
+        bottom: { style: "thin", color: { argb: "FF000000" } },
+        right: { style: "thin", color: { argb: "FF000000" } }
+      };
+    }
+  });
+}
+
 export async function buildExcelReport(filters: ReportFilters) {
   const entries = await listEntries(filters);
   const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet("Production Report");
+  const sheet = workbook.addWorksheet("Bread Production");
   const includeDate = isDateRange(filters);
   const { skus, rows } = buildWideReport(entries);
+  const rowGroups = groupRowsByDate(rows);
+  const lastColumn = (includeDate ? 2 : 1) + skus.length * 2;
 
   let column = 1;
   if (includeDate) {
@@ -102,17 +152,31 @@ export async function buildExcelReport(filters: ReportFilters) {
     row.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
   });
 
-  rows.forEach((row) => {
-    const values: (string | number | null)[] = [];
-    if (includeDate) values.push(row.date);
-    values.push(row.batchNumber);
+  rowGroups.forEach(([date, dateRows]) => {
+    dateRows.forEach((row, index) => {
+      const values: (string | number | null)[] = [];
+      if (includeDate) values.push(index === 0 ? date : null);
+      values.push(row.batchNumber);
 
-    skus.forEach((sku) => {
-      const entry = row.entriesBySku.get(sku.id);
-      values.push(entry?.mouldsUsed ?? null, entry?.quantityProduced ?? null);
+      skus.forEach((sku) => {
+        const entry = row.entriesBySku.get(sku.id);
+        values.push(entry?.mouldsUsed ?? null, entry?.quantityProduced ?? null);
+      });
+
+      sheet.addRow(values);
     });
 
-    sheet.addRow(values);
+    const totalValues: (string | number | null)[] = [];
+    if (includeDate) totalValues.push(null);
+    totalValues.push("Total Production");
+    skus.forEach((sku) => totalValues.push(null, totalQuantity(dateRows, sku.id)));
+    styleSummaryRow(sheet.addRow(totalValues), lastColumn, "FF92D050");
+
+    const damageValues: (string | number | null)[] = [];
+    if (includeDate) damageValues.push(null);
+    damageValues.push("Damages");
+    skus.forEach((sku) => damageValues.push(null, totalDamages(dateRows, sku.id)));
+    styleSummaryRow(sheet.addRow(damageValues), lastColumn, "FFF4B183");
   });
 
   return workbook.xlsx.writeBuffer();
@@ -131,10 +195,12 @@ function drawPdfTable(doc: PDFKit.PDFDocument, rows: ReportRow[], skus: ReportSk
   const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
   const startX = doc.page.margins.left;
   let y = doc.y;
-  const fixedWidth = (includeDate ? 58 : 0) + 48;
+  const labelColumnWidth = 82;
+  const fixedWidth = (includeDate ? 58 : 0) + labelColumnWidth;
   const skuColumnWidth = Math.max(8, (pageWidth - fixedWidth) / Math.max(skus.length * 2, 1));
   const headerHeight = 28;
   const rowHeight = 20;
+  const rowGroups = groupRowsByDate(rows);
 
   const drawHeader = () => {
     let x = startX;
@@ -142,8 +208,8 @@ function drawPdfTable(doc: PDFKit.PDFDocument, rows: ReportRow[], skus: ReportSk
       drawCell(doc, "Date", x, y, 58, headerHeight, true);
       x += 58;
     }
-    drawCell(doc, "Batch Number", x, y, 48, headerHeight, true);
-    x += 48;
+    drawCell(doc, "Batch Number", x, y, labelColumnWidth, headerHeight, true);
+    x += labelColumnWidth;
 
     skus.forEach((sku) => {
       drawCell(doc, sku.name, x, y, skuColumnWidth * 2, 14, true);
@@ -154,9 +220,7 @@ function drawPdfTable(doc: PDFKit.PDFDocument, rows: ReportRow[], skus: ReportSk
     y += headerHeight;
   };
 
-  drawHeader();
-
-  rows.forEach((row) => {
+  const drawReportRow = (dateText: string, label: string, values: Map<string, { mould: string; quantity: string }>, bold = false) => {
     if (y + rowHeight > doc.page.height - doc.page.margins.bottom) {
       doc.addPage();
       y = doc.page.margins.top;
@@ -165,19 +229,43 @@ function drawPdfTable(doc: PDFKit.PDFDocument, rows: ReportRow[], skus: ReportSk
 
     let x = startX;
     if (includeDate) {
-      drawCell(doc, row.date, x, y, 58, rowHeight);
+      drawCell(doc, dateText, x, y, 58, rowHeight, bold);
       x += 58;
     }
-    drawCell(doc, String(row.batchNumber), x, y, 48, rowHeight);
-    x += 48;
+    drawCell(doc, label, x, y, labelColumnWidth, rowHeight, bold);
+    x += labelColumnWidth;
 
     skus.forEach((sku) => {
-      const entry = row.entriesBySku.get(sku.id);
-      drawCell(doc, entry ? String(entry.mouldsUsed) : "", x, y, skuColumnWidth, rowHeight);
-      drawCell(doc, entry ? String(entry.quantityProduced) : "", x + skuColumnWidth, y, skuColumnWidth, rowHeight);
+      const value = values.get(sku.id);
+      drawCell(doc, value?.mould ?? "", x, y, skuColumnWidth, rowHeight, bold);
+      drawCell(doc, value?.quantity ?? "", x + skuColumnWidth, y, skuColumnWidth, rowHeight, bold);
       x += skuColumnWidth * 2;
     });
     y += rowHeight;
+  };
+
+  drawHeader();
+
+  rowGroups.forEach(([date, dateRows]) => {
+    dateRows.forEach((row, index) => {
+      const values = new Map<string, { mould: string; quantity: string }>();
+      skus.forEach((sku) => {
+        const entry = row.entriesBySku.get(sku.id);
+        values.set(sku.id, {
+          mould: entry ? String(entry.mouldsUsed) : "",
+          quantity: entry ? String(entry.quantityProduced) : ""
+        });
+      });
+      drawReportRow(index === 0 ? date : "", String(row.batchNumber), values);
+    });
+
+    const totalValues = new Map<string, { mould: string; quantity: string }>();
+    skus.forEach((sku) => totalValues.set(sku.id, { mould: "", quantity: String(totalQuantity(dateRows, sku.id)) }));
+    drawReportRow("", "Total Production", totalValues, true);
+
+    const damageValues = new Map<string, { mould: string; quantity: string }>();
+    skus.forEach((sku) => damageValues.set(sku.id, { mould: "", quantity: String(totalDamages(dateRows, sku.id)) }));
+    drawReportRow("", "Damages", damageValues, true);
   });
 }
 

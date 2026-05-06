@@ -15,7 +15,7 @@ export function Button({ active, tone = "quiet", className = "", children, ...pr
 
   return (
     <button
-      className={`min-h-12 rounded-md border px-4 py-3 text-base font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${tones[tone]} ${className}`}
+      className={`min-h-12 rounded-md border px-4 py-3 text-center text-base font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${tones[tone]} ${className}`}
       {...props}
     >
       {children}

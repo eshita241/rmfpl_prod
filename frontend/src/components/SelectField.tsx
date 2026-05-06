@@ -14,7 +14,7 @@ export function SelectField({ label, error, options, className = "", ...props }:
       <span className="relative block">
         <select
           aria-invalid={Boolean(error)}
-          className={`h-14 w-full appearance-none rounded-md border bg-field py-0 pl-4 pr-12 text-lg text-ink outline-none sm:pr-14 ${
+          className={`h-14 w-full min-w-0 appearance-none rounded-md border bg-field py-0 pl-4 pr-12 text-base text-ink outline-none sm:pr-14 sm:text-lg ${
             error
               ? "border-red-500 bg-red-50 focus:border-red-600 focus:ring-2 focus:ring-red-200"
               : "border-line focus:border-brand focus:ring-2 focus:ring-brand/20"
