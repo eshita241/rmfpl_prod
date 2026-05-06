@@ -6,7 +6,6 @@ import { param } from "../utils/request.js";
 const entrySchema = z
   .object({
     date: z.string().min(10),
-    shift: z.string().min(1),
     companyId: z.string().min(1),
     skuId: z.string().min(1),
     quantityProduced: z.coerce.number().int().nonnegative().optional(),
@@ -26,8 +25,7 @@ export async function getEntries(req: Request, res: Response) {
       startDate: req.query.startDate as string | undefined,
       endDate: req.query.endDate as string | undefined,
       companyId: req.query.companyId as string | undefined,
-      skuId: req.query.skuId as string | undefined,
-      shift: req.query.shift as string | undefined
+      skuId: req.query.skuId as string | undefined
     })
   );
 }

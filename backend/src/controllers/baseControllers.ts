@@ -28,7 +28,6 @@ export async function getReport(req: Request, res: Response) {
       endDate: z.string().optional(),
       companyId: z.string().optional(),
       skuId: z.string().optional(),
-      shift: z.string().optional(),
       format: z.enum(["pdf", "excel"]).default("excel")
     })
     .parse(req.query);

@@ -72,8 +72,8 @@ export function Logs() {
               <Button onClick={() => setSelectedLog(null)}>Close</Button>
             </div>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <DetailBlock title="Previous" value={selectedLog.changes.previousValues} />
-              <DetailBlock title="New" value={selectedLog.changes.newValues} />
+              <DetailBlock title="Previous" value={hideShift(selectedLog.changes.previousValues)} />
+              <DetailBlock title="New" value={hideShift(selectedLog.changes.newValues)} />
             </div>
           </section>
         </div>
@@ -115,7 +115,6 @@ function summarizeValue(value: unknown) {
   if (item.quantityProduced) parts.push(`Qty: ${item.quantityProduced}`);
   if (item.amount) parts.push(`Damaged: ${item.amount}`);
   if (item.reason) parts.push(`Reason: ${item.reason}`);
-  if (item.shift) parts.push(`Shift: ${item.shift}`);
   if (item.date) parts.push(`Date: ${String(item.date).slice(0, 10)}`);
 
   const sku = item.sku as Record<string, unknown> | undefined;
@@ -124,6 +123,17 @@ function summarizeValue(value: unknown) {
   if (sku?.name) parts.push(`SKU: ${sku.name}`);
 
   return parts.length ? parts.join(" | ") : "Changed";
+}
+
+function hideShift(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(hideShift);
+  if (!value || typeof value !== "object") return value;
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([key]) => key !== "shift")
+      .map(([key, item]) => [key, hideShift(item)])
+  );
 }
 
 function DetailBlock({ title, value }: { title: string; value: unknown }) {

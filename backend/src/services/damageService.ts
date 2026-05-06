@@ -45,7 +45,7 @@ export async function createDamage(input: DamageInput, createdBy: string) {
   const damage = await prisma.damageEntry.create({
     data: {
       date: new Date(input.date),
-      batch: entry.shift,
+      batch: `Batch ${entry.batchNumber}`,
       productionEntryId: entry.id,
       companyId: entry.companyId,
       skuId: entry.skuId,
@@ -108,7 +108,7 @@ export async function updateDamage(id: string, input: DamageInput, performedBy: 
     where: { id },
     data: {
       date: new Date(input.date),
-      batch: entry.shift,
+      batch: `Batch ${entry.batchNumber}`,
       productionEntryId: entry.id,
       companyId: entry.companyId,
       skuId: entry.skuId,

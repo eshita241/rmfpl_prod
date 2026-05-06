@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Save } from "lucide-react";
+import { CheckCircle2, ClipboardList, Save } from "lucide-react";
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
 import { SelectField } from "../components/SelectField";
@@ -9,11 +9,9 @@ import { ApiError } from "../api/client";
 import { localDateInputValue } from "../utils/date";
 
 const today = localDateInputValue();
-const shifts = ["Morning", "Evening", "Night"];
 
 type FormState = {
   date: string;
-  shift: string;
   companyId: string;
   skuId: string;
   mouldsUsed: string;
@@ -21,9 +19,16 @@ type FormState = {
   notes: string;
 };
 
+type SavedEntry = {
+  batchNumber: number;
+  companyName: string;
+  skuName: string;
+  quantityProduced: number;
+  date: string;
+};
+
 const initialForm: FormState = {
   date: today,
-  shift: "Morning",
   companyId: "",
   skuId: "",
   mouldsUsed: "",
@@ -37,6 +42,7 @@ export function NewEntry() {
     return initialForm;
   });
   const [message, setMessage] = useState("");
+  const [savedEntry, setSavedEntry] = useState<SavedEntry | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const companies = useQuery({ queryKey: ["companies"], queryFn: getCompanies });
@@ -54,10 +60,24 @@ export function NewEntry() {
 
   const mutation = useMutation({
     mutationFn: createEntry,
-    onSuccess: () => {
-      setMessage("Entry saved.");
+    onSuccess: (result) => {
+      setSavedEntry({
+        batchNumber: result.entry.batchNumber,
+        companyName: result.entry.company.name,
+        skuName: result.entry.sku.name,
+        quantityProduced: result.entry.quantityProduced,
+        date: result.entry.date.slice(0, 10)
+      });
+      setMessage("");
       setErrors({});
-      setForm((current) => ({ ...current, mouldsUsed: "", emptySlotsPerMould: "0", notes: "" }));
+      setForm((current) => ({
+        ...current,
+        companyId: "",
+        skuId: "",
+        mouldsUsed: "",
+        emptySlotsPerMould: "0",
+        notes: ""
+      }));
       queryClient.invalidateQueries({ queryKey: ["logs"] });
       queryClient.invalidateQueries({ queryKey: ["entries"] });
     },
@@ -91,12 +111,6 @@ export function NewEntry() {
 
       <section className="grid gap-4 md:grid-cols-2">
         <Field label="Date" type="date" error={errors.date} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
-        <SelectField
-          label="Shift"
-          value={form.shift}
-          onChange={(e) => setForm({ ...form, shift: e.target.value })}
-          options={shifts.map((shift) => ({ label: shift, value: shift }))}
-        />
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">
@@ -168,6 +182,53 @@ export function NewEntry() {
       <Button tone="primary" className="w-full text-lg" disabled={mutation.isPending || !form.companyId || !form.skuId} onClick={submit}>
         <span className="inline-flex items-center gap-2"><Save size={22} /> Save Production Entry</span>
       </Button>
+
+      {savedEntry ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-ink/50 p-4">
+          <section className="w-full max-w-md rounded-md border border-line bg-field p-5 shadow-xl">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="mt-1 shrink-0 text-brand" size={30} />
+              <div>
+                <h3 className="text-xl font-bold text-ink">Production Entry Saved</h3>
+                <p className="mt-2 text-ink/70">The form has been cleared to avoid accidental duplicate entry.</p>
+              </div>
+            </div>
+            <dl className="mt-5 grid gap-3 rounded-md border border-line bg-milk p-4 text-sm">
+              <div className="flex justify-between gap-4">
+                <dt className="font-semibold text-ink/65">Date</dt>
+                <dd className="font-bold text-ink">{savedEntry.date}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="font-semibold text-ink/65">Batch</dt>
+                <dd className="font-bold text-ink">Batch {savedEntry.batchNumber}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="font-semibold text-ink/65">SKU</dt>
+                <dd className="text-right font-bold text-ink">{savedEntry.skuName}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="font-semibold text-ink/65">Company</dt>
+                <dd className="text-right font-bold text-ink">{savedEntry.companyName}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="font-semibold text-ink/65">Quantity</dt>
+                <dd className="font-bold text-ink">{savedEntry.quantityProduced} pieces</dd>
+              </div>
+            </dl>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <Button tone="primary" onClick={() => setSavedEntry(null)}>Done</Button>
+              <Button
+                onClick={() => {
+                  setSavedEntry(null);
+                  window.location.hash = "production";
+                }}
+              >
+                <span className="inline-flex items-center gap-2"><ClipboardList size={18} /> View Production Entries</span>
+              </Button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }

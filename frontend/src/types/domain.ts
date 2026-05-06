@@ -27,7 +27,6 @@ export type Sku = {
 export type ProductionEntry = {
   id: string;
   date: string;
-  shift: string;
   batchNumber: number;
   companyId: string;
   skuId: string;

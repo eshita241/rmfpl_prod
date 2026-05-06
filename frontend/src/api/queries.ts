@@ -38,13 +38,12 @@ export const getDamages = (startDate?: string, endDate?: string) => {
 export const updateDamage = (id: string, body: unknown) =>
   api<DamageEntry>(`/damages/${id}`, { method: "PUT", body: JSON.stringify(body) });
 export const deleteDamage = (id: string) => api<void>(`/damages/${id}`, { method: "DELETE" });
-export const getEntries = (startDate?: string, endDate?: string, filters: { companyId?: string; skuId?: string; shift?: string } = {}) => {
+export const getEntries = (startDate?: string, endDate?: string, filters: { companyId?: string; skuId?: string } = {}) => {
   const params = new URLSearchParams();
   if (startDate) params.set("startDate", startDate);
   if (endDate) params.set("endDate", endDate);
   if (filters.companyId) params.set("companyId", filters.companyId);
   if (filters.skuId) params.set("skuId", filters.skuId);
-  if (filters.shift) params.set("shift", filters.shift);
   return api<ProductionEntry[]>(`/entries?${params.toString()}`);
 };
 export const getLogs = (date?: string) => api<Log[]>(`/logs${date ? `?date=${date}` : ""}`);

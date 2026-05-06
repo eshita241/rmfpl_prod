@@ -126,7 +126,7 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
             options={[
               { label: "Select production entry", value: "" },
               ...(entries.data ?? []).map((entry) => ({
-                label: `${entry.sku.name} | Batch ${entry.batchNumber} | ${entry.company.name} | ${entry.shift} | Produced ${entry.quantityProduced}`,
+                label: `${entry.sku.name} | Batch ${entry.batchNumber} | ${entry.company.name} | Produced ${entry.quantityProduced}`,
                 value: entry.id
               }))
             ]}
@@ -148,7 +148,7 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
 
         {selectedEntry ? (
           <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4 font-semibold text-amber-900">
-            Recording damage for {selectedEntry.sku.name}, Batch {selectedEntry.batchNumber}, {selectedEntry.company.name}, {selectedEntry.shift}. Remaining allowed: {remainingDamage(selectedEntry)}.
+            Recording damage for {selectedEntry.sku.name}, Batch {selectedEntry.batchNumber}, {selectedEntry.company.name}. Remaining allowed: {remainingDamage(selectedEntry)}.
           </div>
         ) : null}
 
@@ -168,7 +168,7 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
                 <AlertTriangle className="mt-1 text-action" size={24} />
                 <div>
                   <strong>{damage.amount} damaged | {damage.sku.name}</strong>
-                  <p className="text-sm text-ink/65">{damage.company.name} {damage.batch ? `| ${damage.batch}` : ""} | {formatIst(damage.createdAt)}</p>
+                  <p className="text-sm text-ink/65">{damage.company.name} | {damageBatchLabel(damage)} | {formatIst(damage.createdAt)}</p>
                   <p className="mt-2 text-sm">{damage.reason}</p>
                   {isAdmin ? (
                     <div className="mt-3 flex gap-2">
@@ -230,7 +230,7 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
                 options={[
                   { label: "Select production entry", value: "" },
                   ...(editEntries.data ?? []).map((entry) => ({
-                    label: `${entry.sku.name} | Batch ${entry.batchNumber} | ${entry.shift} | Produced ${entry.quantityProduced}`,
+                    label: `${entry.sku.name} | Batch ${entry.batchNumber} | Produced ${entry.quantityProduced}`,
                     value: entry.id
                   }))
                 ]}
@@ -261,4 +261,8 @@ function remainingDamage(entry: {
 }) {
   const damaged = entry.damageEntries?.reduce((total, damage) => total + damage.amount, 0) ?? 0;
   return Math.max(entry.quantityProduced - damaged, 0);
+}
+
+function damageBatchLabel(damage: DamageEntry) {
+  return damage.productionEntry?.batchNumber ? `Batch ${damage.productionEntry.batchNumber}` : "Batch -";
 }

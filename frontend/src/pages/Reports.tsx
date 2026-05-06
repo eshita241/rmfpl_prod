@@ -17,7 +17,7 @@ export function Reports({ isAdmin }: { isAdmin: boolean }) {
   const [endDate, setEndDate] = useState(localDateInputValue());
   const [downloadFormat, setDownloadFormat] = useState<"excel" | "pdf">("excel");
   const [confirmDownload, setConfirmDownload] = useState(false);
-  const [filters, setFilters] = useState({ companyId: "", skuId: "", shift: "" });
+  const [filters, setFilters] = useState({ companyId: "", skuId: "" });
   const [entryToEdit, setEntryToEdit] = useState<ProductionEntry | null>(null);
   const [entryToArchive, setEntryToArchive] = useState<ProductionEntry | null>(null);
   const companies = useQuery({ queryKey: ["companies"], queryFn: getCompanies });
@@ -58,7 +58,6 @@ export function Reports({ isAdmin }: { isAdmin: boolean }) {
     const params = new URLSearchParams({ startDate, endDate, format });
     if (filters.companyId) params.set("companyId", filters.companyId);
     if (filters.skuId) params.set("skuId", filters.skuId);
-    if (filters.shift) params.set("shift", filters.shift);
     window.location.href = downloadUrl(`/reports?${params.toString()}`);
   }
 
@@ -109,18 +108,7 @@ export function Reports({ isAdmin }: { isAdmin: boolean }) {
         </div>
       </section>
       <section className="rounded-md border border-line bg-field p-4">
-        <div className="grid gap-4 md:grid-cols-3">
-          <SelectField
-            label="Shift"
-            value={filters.shift}
-            onChange={(e) => setFilters({ ...filters, shift: e.target.value })}
-            options={[
-              { label: "All shifts", value: "" },
-              { label: "Morning", value: "Morning" },
-              { label: "Evening", value: "Evening" },
-              { label: "Night", value: "Night" }
-            ]}
-          />
+        <div className="grid gap-4 md:grid-cols-2">
           <SelectField
             label="Company"
             value={filters.companyId}
@@ -142,10 +130,10 @@ export function Reports({ isAdmin }: { isAdmin: boolean }) {
         </div>
       </section>
       <div className="overflow-x-auto rounded-md border border-line bg-field">
-        <table className="w-full min-w-[1100px] text-left">
+        <table className="w-full min-w-[1000px] text-left">
           <thead className="bg-paper text-sm uppercase text-ink/70">
             <tr>
-              <th className="p-3">Date</th><th>Created (IST)</th><th>Company</th><th>SKU</th><th>Batch</th><th>Shift</th><th>Quantity</th><th>Damages</th><th>Net</th><th>Reason</th>
+              <th className="p-3">Date</th><th>Created (IST)</th><th>Company</th><th>SKU</th><th>Batch</th><th>Quantity</th><th>Damages</th><th>Net</th><th>Reason</th>
               {isAdmin ? <th>Admin</th> : null}
             </tr>
           </thead>
@@ -222,7 +210,6 @@ function ReportRow({
       <td>{entry.company.name}</td>
       <td>{entry.sku.name}</td>
       <td>Batch {entry.batchNumber}</td>
-      <td>{entry.shift}</td>
       <td>{entry.quantityProduced}</td>
       <td>{damages.amount}</td>
       <td>{entry.quantityProduced - damages.amount}</td>
@@ -270,16 +257,6 @@ function EntryEditor({
         <h3 className="text-xl font-bold text-ink">Edit Production Entry</h3>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <Field label="Date" type="date" value={draft.date.slice(0, 10)} onChange={(e) => setDraft({ ...draft, date: e.target.value })} />
-          <SelectField
-            label="Shift"
-            value={draft.shift}
-            onChange={(e) => setDraft({ ...draft, shift: e.target.value })}
-            options={[
-              { label: "Morning", value: "Morning" },
-              { label: "Evening", value: "Evening" },
-              { label: "Night", value: "Night" }
-            ]}
-          />
           <Field label="Quantity" type="number" value={String(draft.quantityProduced)} onChange={(e) => setDraft({ ...draft, quantityProduced: Number(e.target.value) })} />
           <Field label="Moulds Used" type="number" value={String(draft.mouldsUsed)} onChange={(e) => setDraft({ ...draft, mouldsUsed: Number(e.target.value) })} />
           <Field label="Empty Slots Per Mould" type="number" value={String(draft.emptySlotsPerMould)} onChange={(e) => setDraft({ ...draft, emptySlotsPerMould: Number(e.target.value) })} />
@@ -302,12 +279,11 @@ function entryPayload(entry: ProductionEntry) {
     id: entry.id,
     payload: {
       date: entry.date.slice(0, 10),
-      shift: entry.shift,
       companyId: entry.companyId,
       skuId: entry.skuId,
       mouldsUsed: entry.mouldsUsed,
-      emptySlotsPerMould: entry.emptySlotsPerMould
-      ,notes: entry.notes ?? ""
+      emptySlotsPerMould: entry.emptySlotsPerMould,
+      notes: entry.notes ?? ""
     }
   };
 }

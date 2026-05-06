@@ -8,7 +8,7 @@ import { Field } from "../components/Field";
 export function Login() {
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<"login" | "signup">("login");
-  const [form, setForm] = useState({ name: "", email: "admin@example.com", password: "admin12345" });
+  const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [message, setMessage] = useState("");
 
   const authMutation = useMutation({
@@ -38,10 +38,10 @@ export function Login() {
 
         <div className="mt-5 space-y-4">
           {mode === "signup" ? (
-            <Field label="Name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+            <Field label="Name" placeholder="Example User" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
           ) : null}
-          <Field label="Email" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
-          <Field label="Password" type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} />
+          <Field label="Email" type="email" placeholder="example@email.com" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
+          <Field label="Password" type="password" placeholder="Example password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} />
         </div>
 
         {message ? <p className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800">{message}</p> : null}

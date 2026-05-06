@@ -6,16 +6,13 @@ const prisma = new PrismaClient();
 const companies = [
   {
     name: "Red Cow",
-    skus: [
-      { name: "Paneer 200g", weight: 200, mouldCapacity: 120 },
-      { name: "Paneer 500g", weight: 500, mouldCapacity: 80 }
-    ]
+    skus: []
   },
   {
     name: "Modern",
     skus: [
-      { name: "Cheese Block 250g", weight: 250, mouldCapacity: 100 },
-      { name: "Curd Cup 100g", weight: 100, mouldCapacity: 160 }
+      { name: "200GM Slice Bread", weight: 200, mouldCapacity: 6 },
+      { name: "400GM Slice Bread", weight: 400, mouldCapacity: 3 }
     ]
   }
 ];

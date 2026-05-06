@@ -6,7 +6,6 @@ import { writeLog } from "./logService.js";
 
 export type EntryInput = {
   date: string;
-  shift: string;
   companyId: string;
   skuId: string;
   quantityProduced?: number;
@@ -67,6 +66,7 @@ export async function createEntry(input: EntryInput, createdBy: string) {
   const entry = await prisma.productionEntry.create({
     data: {
       ...input,
+      shift: "General",
       quantityProduced: capacity.quantityProduced,
       date: new Date(input.date),
       batchNumber,
@@ -87,13 +87,12 @@ export async function createEntry(input: EntryInput, createdBy: string) {
   return { entry, ...capacity };
 }
 
-export async function listEntries(filters: { startDate?: string; endDate?: string; companyId?: string; skuId?: string; shift?: string }) {
+export async function listEntries(filters: { startDate?: string; endDate?: string; companyId?: string; skuId?: string }) {
   return prisma.productionEntry.findMany({
     where: {
       deletedAt: null,
       companyId: filters.companyId || undefined,
       skuId: filters.skuId || undefined,
-      shift: filters.shift || undefined,
       date: {
         gte: filters.startDate ? new Date(filters.startDate) : undefined,
         lte: filters.endDate ? new Date(`${filters.endDate}T23:59:59.999Z`) : undefined
@@ -133,6 +132,7 @@ export async function updateEntry(id: string, input: EntryInput, performedBy: st
     where: { id },
     data: {
       ...input,
+      shift: "General",
       quantityProduced: capacity.quantityProduced,
       date: new Date(input.date),
       batchNumber,
