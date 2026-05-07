@@ -7,18 +7,24 @@ import { Field } from "../components/Field";
 import { Modal } from "../components/Modal";
 import { SelectField } from "../components/SelectField";
 
+const skuCategoryOptions = [
+  { label: "Bread", value: "BREAD" },
+  { label: "Bun", value: "BUN" },
+  { label: "Other", value: "OTHER" }
+];
+
 export function Admin() {
   const queryClient = useQueryClient();
   const companies = useQuery({ queryKey: ["companies"], queryFn: getCompanies });
   const skus = useQuery({ queryKey: ["skus", "admin"], queryFn: () => getSkus(undefined, true) });
   const users = useQuery({ queryKey: ["users"], queryFn: getUsers });
-  const [skuForm, setSkuForm] = useState({ name: "", companyId: "", weight: "", mouldCapacity: "" });
+  const [skuForm, setSkuForm] = useState({ name: "", companyId: "", category: "OTHER", weight: "", mouldCapacity: "" });
   const [editingSkuId, setEditingSkuId] = useState<string | null>(null);
   const [showSkuForm, setShowSkuForm] = useState(false);
   const [skuToDelete, setSkuToDelete] = useState<{ id: string; name: string; company?: string } | null>(null);
 
   function resetSkuForm() {
-    setSkuForm({ name: "", companyId: "", weight: "", mouldCapacity: "" });
+    setSkuForm({ name: "", companyId: "", category: "OTHER", weight: "", mouldCapacity: "" });
     setEditingSkuId(null);
     setShowSkuForm(false);
   }
@@ -61,7 +67,7 @@ export function Admin() {
           <Button
             tone="primary"
             onClick={() => {
-              setSkuForm({ name: "", companyId: "", weight: "", mouldCapacity: "" });
+              setSkuForm({ name: "", companyId: "", category: "OTHER", weight: "", mouldCapacity: "" });
               setEditingSkuId(null);
               setShowSkuForm(true);
             }}
@@ -78,8 +84,14 @@ export function Admin() {
                 <span className="inline-flex items-center gap-2"><X size={18} /> Close</span>
               </Button>
             </div>
-            <div className="mt-4 grid gap-4 md:grid-cols-4">
+            <div className="mt-4 grid gap-4 md:grid-cols-5">
               <Field label="SKU Name" value={skuForm.name} onChange={(e) => setSkuForm({ ...skuForm, name: e.target.value })} />
+              <SelectField
+                label="Category"
+                value={skuForm.category}
+                onChange={(e) => setSkuForm({ ...skuForm, category: e.target.value })}
+                options={skuCategoryOptions}
+              />
               <Field label="Weight" type="number" value={skuForm.weight} onChange={(e) => setSkuForm({ ...skuForm, weight: e.target.value })} />
               <Field label="Mould Capacity" type="number" value={skuForm.mouldCapacity} onChange={(e) => setSkuForm({ ...skuForm, mouldCapacity: e.target.value })} />
               <SelectField
@@ -91,7 +103,7 @@ export function Admin() {
                   ...(companies.data ?? []).map((company) => ({ label: company.name, value: company.id }))
                 ]}
               />
-              <Button className="w-full self-end md:w-auto" tone="primary" disabled={!skuForm.name || !skuForm.companyId || !skuForm.weight || !skuForm.mouldCapacity} onClick={() => skuMutation.mutate(skuForm)}>
+              <Button className="w-full self-end md:w-auto" tone="primary" disabled={!skuForm.name || !skuForm.companyId || !skuForm.category || !skuForm.weight || !skuForm.mouldCapacity} onClick={() => skuMutation.mutate(skuForm)}>
                 Add SKU
               </Button>
             </div>
@@ -105,7 +117,7 @@ export function Admin() {
                 <strong>{sku.name}</strong>
                 {sku.deletedAt ? <span className="ml-2 rounded-md bg-slate-200 px-2 py-1 text-xs font-bold text-slate-700">Archived</span> : null}
                 <br />
-                <small>{sku.company?.name} | {sku.weight}g | {sku.mouldCapacity}</small>
+                <small>{sku.company?.name} | {categoryLabel(sku.category)} | {sku.weight}g | {sku.mouldCapacity}</small>
               </span>
               <div className="flex gap-2 sm:shrink-0">
                 <Button
@@ -116,6 +128,7 @@ export function Admin() {
                     setSkuForm({
                       name: sku.name,
                       companyId: sku.companyId,
+                      category: sku.category,
                       weight: String(sku.weight),
                       mouldCapacity: String(sku.mouldCapacity)
                     });
@@ -138,7 +151,7 @@ export function Admin() {
           actions={
             <div className="grid gap-3 sm:grid-cols-2">
               <Button onClick={resetSkuForm}>Cancel</Button>
-              <Button tone="primary" disabled={!skuForm.name || !skuForm.companyId || !skuForm.weight || !skuForm.mouldCapacity || skuMutation.isPending} onClick={() => skuMutation.mutate(skuForm)}>
+              <Button tone="primary" disabled={!skuForm.name || !skuForm.companyId || !skuForm.category || !skuForm.weight || !skuForm.mouldCapacity || skuMutation.isPending} onClick={() => skuMutation.mutate(skuForm)}>
                 Save SKU
               </Button>
             </div>
@@ -146,6 +159,12 @@ export function Admin() {
         >
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <Field label="SKU Name" value={skuForm.name} onChange={(e) => setSkuForm({ ...skuForm, name: e.target.value })} />
+              <SelectField
+                label="Category"
+                value={skuForm.category}
+                onChange={(e) => setSkuForm({ ...skuForm, category: e.target.value })}
+                options={skuCategoryOptions}
+              />
               <Field label="Weight" type="number" value={skuForm.weight} onChange={(e) => setSkuForm({ ...skuForm, weight: e.target.value })} />
               <Field label="Mould Capacity" type="number" value={skuForm.mouldCapacity} onChange={(e) => setSkuForm({ ...skuForm, mouldCapacity: e.target.value })} />
               <SelectField
@@ -203,4 +222,10 @@ export function Admin() {
       ) : null}
     </div>
   );
+}
+
+function categoryLabel(category: string) {
+  if (category === "BREAD") return "Bread";
+  if (category === "BUN") return "Bun";
+  return "Other";
 }

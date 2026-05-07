@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { SkuCategory } from "@prisma/client";
 import { z } from "zod";
 import { createSku, deleteSku, listSkus, updateSku } from "../services/skuService.js";
 import { param } from "../utils/request.js";
@@ -6,6 +7,7 @@ import { param } from "../utils/request.js";
 const skuSchema = z.object({
   name: z.string().min(2),
   companyId: z.string().min(1),
+  category: z.nativeEnum(SkuCategory).default(SkuCategory.OTHER),
   weight: z.coerce.number().positive(),
   mouldCapacity: z.coerce.number().int().positive()
 });

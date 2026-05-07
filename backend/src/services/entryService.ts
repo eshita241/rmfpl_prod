@@ -1,4 +1,4 @@
-import { ActionType, LogEntity, Role } from "@prisma/client";
+import { ActionType, LogEntity, Role, SkuCategory } from "@prisma/client";
 import { prisma } from "../config/prisma.js";
 import { AppError, notFound } from "../utils/errors.js";
 import { safeUserSelect } from "../utils/selects.js";
@@ -50,8 +50,8 @@ function assertUserCanWriteDate(date: string, role: Role) {
   }
 }
 
-function isBreadSku(sku: { name: string }) {
-  return /\bbread\b/i.test(sku.name);
+function isBreadSku(sku: { category: SkuCategory }) {
+  return sku.category === SkuCategory.BREAD;
 }
 
 async function batchScopeWhere(skuId: string) {
@@ -61,7 +61,7 @@ async function batchScopeWhere(skuId: string) {
   return isBreadSku(sku)
     ? {
         companyId: sku.companyId,
-        sku: { name: { contains: "bread", mode: "insensitive" as const } }
+        sku: { category: SkuCategory.BREAD }
       }
     : { skuId };
 }

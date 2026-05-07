@@ -139,7 +139,7 @@ export function NewEntry({ isAdmin }: { isAdmin: boolean }) {
           options={[
             { label: form.companyId ? "Select SKU" : "Select company first", value: "" },
             ...(skus.data ?? []).map((sku) => ({
-              label: `${sku.name} (${sku.weight} g, ${sku.mouldCapacity} pieces/mould)`,
+              label: `${sku.name} (${sku.category.toLowerCase()}, ${sku.weight} g, ${sku.mouldCapacity} pieces/mould)`,
               value: sku.id
             }))
           ]}

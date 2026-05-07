@@ -1,4 +1,5 @@
 import { PrismaClient, Role } from "@prisma/client";
+import { SkuCategory } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -11,8 +12,8 @@ const companies = [
   {
     name: "Modern",
     skus: [
-      { name: "200GM Slice Bread", weight: 200, mouldCapacity: 6 },
-      { name: "400GM Slice Bread", weight: 400, mouldCapacity: 3 }
+      { name: "200GM Slice Bread", category: SkuCategory.BREAD, weight: 200, mouldCapacity: 6 },
+      { name: "400GM Slice Bread", category: SkuCategory.BREAD, weight: 400, mouldCapacity: 3 }
     ]
   }
 ];

@@ -17,6 +17,7 @@ export type Sku = {
   id: string;
   name: string;
   companyId: string;
+  category: "BREAD" | "BUN" | "OTHER";
   weight: number;
   mouldCapacity: number;
   createdAt?: string;
