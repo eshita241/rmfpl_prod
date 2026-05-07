@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, Download, Pencil } from "lucide-react";
-import { useState } from "react";
+import { Archive, Download, Package, Pencil } from "lucide-react";
+import { useMemo, useState } from "react";
 import { downloadUrl } from "../api/client";
 import { deleteEntry, getCompanies, getEntries, getSkus, updateEntry } from "../api/queries";
 import { Button } from "../components/Button";
@@ -19,11 +19,19 @@ export function Reports({ isAdmin }: { isAdmin: boolean }) {
   const [downloadFormat, setDownloadFormat] = useState<"excel" | "pdf">("excel");
   const [confirmDownload, setConfirmDownload] = useState(false);
   const [filters, setFilters] = useState({ companyId: "", skuId: "" });
+  const [selectedSummarySkuId, setSelectedSummarySkuId] = useState("");
+  const [logsVisible, setLogsVisible] = useState(true);
   const [entryToEdit, setEntryToEdit] = useState<ProductionEntry | null>(null);
   const [entryToArchive, setEntryToArchive] = useState<ProductionEntry | null>(null);
   const companies = useQuery({ queryKey: ["companies"], queryFn: getCompanies });
   const skus = useQuery({ queryKey: ["skus", filters.companyId], queryFn: () => getSkus(filters.companyId || undefined) });
   const entries = useQuery({ queryKey: ["entries", startDate, endDate, filters], queryFn: () => getEntries(startDate, endDate, filters) });
+  const skuSummaries = useMemo(() => buildSkuSummaries(entries.data ?? []), [entries.data]);
+  const tableEntries = useMemo(
+    () => selectedSummarySkuId ? (entries.data ?? []).filter((entry) => entry.skuId === selectedSummarySkuId) : entries.data ?? [],
+    [entries.data, selectedSummarySkuId]
+  );
+  const selectedSummary = skuSummaries.find((summary) => summary.skuId === selectedSummarySkuId);
   const editMutation = useMutation({
     mutationFn: (body: ReturnType<typeof entryPayload>) => updateEntry(body.id, body.payload),
     onSuccess: () => {
@@ -113,7 +121,10 @@ export function Reports({ isAdmin }: { isAdmin: boolean }) {
           <SelectField
             label="Company"
             value={filters.companyId}
-            onChange={(e) => setFilters({ ...filters, companyId: e.target.value, skuId: "" })}
+            onChange={(e) => {
+              setSelectedSummarySkuId("");
+              setFilters({ ...filters, companyId: e.target.value, skuId: "" });
+            }}
             options={[
               { label: "All companies", value: "" },
               ...(companies.data ?? []).map((company) => ({ label: company.name, value: company.id }))
@@ -122,7 +133,10 @@ export function Reports({ isAdmin }: { isAdmin: boolean }) {
           <SelectField
             label="SKU / Bread Variant"
             value={filters.skuId}
-            onChange={(e) => setFilters({ ...filters, skuId: e.target.value })}
+            onChange={(e) => {
+              setSelectedSummarySkuId("");
+              setFilters({ ...filters, skuId: e.target.value });
+            }}
             options={[
               { label: "All variants", value: "" },
               ...(skus.data ?? []).map((sku) => ({ label: sku.name, value: sku.id }))
@@ -130,21 +144,75 @@ export function Reports({ isAdmin }: { isAdmin: boolean }) {
           />
         </div>
       </section>
-      <div className="overflow-x-auto rounded-md border border-line bg-field">
-        <table className="w-full min-w-[1000px] text-left">
-          <thead className="bg-paper text-sm uppercase text-ink/70">
-            <tr>
-              <th className="p-3">Date</th><th>Created (IST)</th><th>Company</th><th>SKU</th><th>Batch</th><th>Quantity</th><th>Damages</th><th>Net</th><th>Reason</th>
-              {isAdmin ? <th>Admin</th> : null}
-            </tr>
-          </thead>
-          <tbody>
-            {(entries.data ?? []).map((entry) => (
-              <ReportRow key={entry.id} entry={entry} isAdmin={isAdmin} onEdit={setEntryToEdit} onArchive={setEntryToArchive} />
+
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-lg font-bold text-ink">SKU Totals</h3>
+          <div className="flex flex-wrap gap-2">
+            {selectedSummarySkuId || !logsVisible ? (
+              <Button onClick={() => {
+                setSelectedSummarySkuId("");
+                setLogsVisible(true);
+              }}>
+                Show All Logs
+              </Button>
+            ) : null}
+            {logsVisible ? <Button onClick={() => setLogsVisible(false)}>Hide All Logs</Button> : null}
+          </div>
+        </div>
+        {skuSummaries.length > 0 ? (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {skuSummaries.map((summary) => (
+              <button
+                key={summary.skuId}
+                className={`min-h-32 rounded-md border p-4 text-left transition ${
+                  selectedSummarySkuId === summary.skuId ? "border-action bg-brand shadow-sm" : "border-line bg-field hover:border-brand"
+                }`}
+                onClick={() => {
+                  setSelectedSummarySkuId(summary.skuId);
+                  setLogsVisible(true);
+                }}
+              >
+                <div className="flex items-start gap-3">
+                  <Package className="mt-1 shrink-0 text-action" size={22} />
+                  <div className="min-w-0">
+                    <span className="block truncate text-base font-bold text-ink">{summary.skuName}</span>
+                    <span className="mt-1 block text-sm font-semibold text-ink/65">{summary.companyName}</span>
+                  </div>
+                </div>
+                <strong className="mt-4 block text-3xl text-ink">{summary.quantityProduced}</strong>
+                <span className="mt-1 block text-sm font-semibold text-ink/65">{summary.entryCount} logs</span>
+              </button>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </div>
+        ) : (
+          <div className="rounded-md border border-line bg-field p-4 font-semibold text-ink/65">
+            No SKU totals found for this date filter.
+          </div>
+        )}
+      </section>
+
+      {logsVisible ? (
+        <div className="overflow-x-auto rounded-md border border-line bg-field">
+          <div className="border-b border-line p-3 font-semibold text-ink">
+            {selectedSummary ? `${selectedSummary.skuName} logs` : "All logs"}
+          </div>
+          <table className="w-full min-w-[1000px] text-left">
+            <thead className="bg-paper text-sm uppercase text-ink/70">
+              <tr>
+                <th className="p-3">Date</th><th>Created (IST)</th><th>Company</th><th>SKU</th><th>Batch</th><th>Quantity</th><th>Damages</th><th>Net</th><th>Reason</th>
+                {isAdmin ? <th>Admin</th> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {tableEntries.map((entry) => (
+                <ReportRow key={entry.id} entry={entry} isAdmin={isAdmin} onEdit={setEntryToEdit} onArchive={setEntryToArchive} />
+              ))}
+            </tbody>
+          </table>
+          {tableEntries.length === 0 ? <div className="p-5 text-center font-semibold text-ink/65">No logs found.</div> : null}
+        </div>
+      ) : null}
 
       {entryToEdit ? (
         <EntryEditor
@@ -189,6 +257,25 @@ export function Reports({ isAdmin }: { isAdmin: boolean }) {
       ) : null}
     </div>
   );
+}
+
+function buildSkuSummaries(entries: ProductionEntry[]) {
+  return Array.from(
+    entries.reduce((summaries, entry) => {
+      const current = summaries.get(entry.skuId) ?? {
+        skuId: entry.skuId,
+        skuName: entry.sku.name,
+        companyName: entry.company.name,
+        quantityProduced: 0,
+        entryCount: 0
+      };
+      current.quantityProduced += entry.quantityProduced;
+      current.entryCount += 1;
+      summaries.set(entry.skuId, current);
+      return summaries;
+    }, new Map<string, { skuId: string; skuName: string; companyName: string; quantityProduced: number; entryCount: number }>())
+      .values()
+  ).sort((a, b) => `${a.companyName} ${a.skuName}`.localeCompare(`${b.companyName} ${b.skuName}`));
 }
 
 function ReportRow({

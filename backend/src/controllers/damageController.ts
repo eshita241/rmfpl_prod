@@ -11,7 +11,7 @@ const damageSchema = z.object({
 });
 
 export async function postDamage(req: Request, res: Response) {
-  const damage = await createDamage(damageSchema.parse(req.body), req.user!.id);
+  const damage = await createDamage(damageSchema.parse(req.body), req.user!.id, req.user!.role);
   res.status(201).json(damage);
 }
 

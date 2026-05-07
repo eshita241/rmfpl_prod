@@ -37,7 +37,7 @@ const initialForm: FormState = {
   notes: ""
 };
 
-export function NewEntry() {
+export function NewEntry({ isAdmin }: { isAdmin: boolean }) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<FormState>(() => {
     return initialForm;
@@ -58,6 +58,7 @@ export function NewEntry() {
     queryFn: () => getNextBatch(form.date, form.skuId),
     enabled: Boolean(form.date && form.skuId)
   });
+  const selectedDateIsClosed = !isAdmin && form.date !== today;
 
   const mutation = useMutation({
     mutationFn: createEntry,
@@ -113,6 +114,12 @@ export function NewEntry() {
       <section className="grid gap-4 md:grid-cols-2">
         <Field label="Date" type="date" error={errors.date} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
       </section>
+
+      {selectedDateIsClosed ? (
+        <div className="rounded-md border border-line bg-field p-4 font-semibold text-ink">
+          This day has ended. You can view data and download reports for previous dates, but only admins can add production entries for them.
+        </div>
+      ) : null}
 
       <section className="grid gap-4 md:grid-cols-2">
         <SelectField
@@ -180,7 +187,7 @@ export function NewEntry() {
       ) : null}
 
       {message ? <div className="rounded-md border border-line bg-field p-4 font-semibold text-ink">{message}</div> : null}
-      <Button tone="primary" className="w-full text-lg" disabled={mutation.isPending || !form.companyId || !form.skuId} onClick={submit}>
+      <Button tone="primary" className="w-full text-lg" disabled={selectedDateIsClosed || mutation.isPending || !form.companyId || !form.skuId} onClick={submit}>
         <span className="inline-flex items-center gap-2"><Save size={22} /> Save Production Entry</span>
       </Button>
 

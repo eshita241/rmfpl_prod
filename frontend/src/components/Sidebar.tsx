@@ -1,4 +1,4 @@
-import { AlertTriangle, ClipboardList, Download, Factory, FileText, ListChecks, LogOut, Menu, Shield, X } from "lucide-react";
+import { AlertTriangle, ClipboardList, Download, FileText, ListChecks, LogOut, Menu, Shield, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { promptInstall, subscribeInstallPrompt } from "../pwa";
 import { Button } from "./Button";
@@ -40,15 +40,10 @@ export function Sidebar({
   }, []);
 
   const content = (
-    <aside className="flex h-full w-[min(18rem,calc(100vw-3rem))] flex-col border-r border-line bg-[#f1faed] text-ink">
-      <div className="flex items-center gap-3 border-b border-line p-5">
-        <div className="grid h-12 w-12 place-items-center rounded-md bg-brand text-white shadow-sm">
-          <Factory size={28} />
-        </div>
-        <div>
-          <h1 className="text-lg font-bold">RMFPL_MGMT</h1>
-          <p className="text-sm text-ink/60">{userName} | {role}</p>
-        </div>
+    <aside className="flex h-full w-[min(18rem,calc(100vw-3rem))] flex-col border-r border-line bg-paper text-ink">
+      <div className="border-b border-line p-5">
+        <img className="h-auto w-full" src="/logo-rmfpl.png" alt="Rajnandita Milk and Foods ERP" />
+        <p className="mt-3 text-sm font-semibold text-ink/60">{userName} | {role}</p>
       </div>
 
       <nav className="flex-1 space-y-2 p-3">
@@ -65,7 +60,7 @@ export function Sidebar({
                   setOpen(false);
                 }}
                 className={`flex min-h-14 w-full items-center gap-3 rounded-md px-4 text-left text-base font-bold transition ${
-                  active ? "bg-brand text-white shadow-sm" : "text-ink hover:bg-milk"
+                  active ? "bg-brand text-ink shadow-sm" : "text-ink hover:bg-milk"
                 }`}
               >
                 <Icon size={22} />
@@ -89,7 +84,7 @@ export function Sidebar({
   return (
     <>
       <button
-        className="fixed left-3 top-3 z-40 grid h-12 w-12 place-items-center rounded-md bg-brand text-white shadow-lg md:hidden"
+        className="fixed left-3 top-3 z-40 grid h-12 w-12 place-items-center rounded-md bg-brand text-ink shadow-lg md:hidden"
         onClick={() => setOpen(true)}
         aria-label="Open menu"
       >
@@ -101,7 +96,7 @@ export function Sidebar({
           <button className="absolute inset-0 bg-ink/50" onClick={() => setOpen(false)} aria-label="Close menu" />
           <div className="relative h-full">
             {content}
-            <button className="absolute right-3 top-3 grid h-10 w-10 place-items-center rounded-md bg-white text-brand shadow-sm" onClick={() => setOpen(false)} aria-label="Close menu">
+            <button className="absolute right-3 top-3 grid h-10 w-10 place-items-center rounded-md bg-paper text-ink shadow-sm" onClick={() => setOpen(false)} aria-label="Close menu">
               <X size={22} />
             </button>
           </div>

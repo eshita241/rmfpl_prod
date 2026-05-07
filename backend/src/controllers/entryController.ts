@@ -15,7 +15,7 @@ const entrySchema = z
   });
 
 export async function postEntry(req: Request, res: Response) {
-  const result = await createEntry(entrySchema.parse(req.body), req.user!.id);
+  const result = await createEntry(entrySchema.parse(req.body), req.user!.id, req.user!.role);
   res.status(201).json(result);
 }
 

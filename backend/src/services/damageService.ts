@@ -1,4 +1,4 @@
-import { ActionType, LogEntity } from "@prisma/client";
+import { ActionType, LogEntity, Role } from "@prisma/client";
 import { prisma } from "../config/prisma.js";
 import { AppError } from "../utils/errors.js";
 import { safeUserSelect } from "../utils/selects.js";
@@ -11,6 +11,24 @@ export type DamageInput = {
   amount: number;
   reason: string;
 };
+
+function todayInIst() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function assertUserCanWriteDate(date: string, role: Role) {
+  if (role === Role.ADMIN) return;
+  if (date.slice(0, 10) !== todayInIst()) {
+    throw new AppError("Only admins can add or change damage entries for previous dates.", 403);
+  }
+}
 
 async function getProductionEntry(input: DamageInput) {
   const entry = await prisma.productionEntry.findUnique({
@@ -40,7 +58,8 @@ async function getProductionEntry(input: DamageInput) {
   return entry;
 }
 
-export async function createDamage(input: DamageInput, createdBy: string) {
+export async function createDamage(input: DamageInput, createdBy: string, role: Role) {
+  assertUserCanWriteDate(input.date, role);
   const entry = await getProductionEntry(input);
   const damage = await prisma.damageEntry.create({
     data: {

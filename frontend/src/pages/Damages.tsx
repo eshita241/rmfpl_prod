@@ -44,6 +44,7 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
   });
   const damages = useQuery({ queryKey: ["damages", form.date], queryFn: () => getDamages(form.date, form.date) });
   const selectedEntry = entries.data?.find((entry) => entry.id === form.productionEntryId);
+  const selectedDateIsClosed = !isAdmin && form.date !== today;
 
   const mutation = useMutation({
     mutationFn: createDamage,
@@ -127,6 +128,11 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
 
       <section className="rounded-md border border-line bg-field p-4 shadow-sm">
         <h3 className="text-xl font-bold text-ink">Log Damage</h3>
+        {selectedDateIsClosed ? (
+          <div className="mt-4 rounded-md border border-line bg-field p-4 font-semibold text-ink">
+            This day has ended. You can view previous damage data, but only admins can add damage entries for previous dates.
+          </div>
+        ) : null}
         <div className="mt-6 grid gap-5 md:grid-cols-2">
           <Field label="Date" type="date" error={errors.date} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
           <Field label="Amount Damaged" type="number" inputMode="numeric" error={errors.amount} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
@@ -166,7 +172,7 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
           </div>
         ) : null}
 
-        <Button tone="primary" className="mt-5 w-full text-lg" disabled={mutation.isPending || !form.productionEntryId || !form.amount || !form.reason} onClick={submit}>
+        <Button tone="primary" className="mt-5 w-full text-lg" disabled={selectedDateIsClosed || mutation.isPending || !form.productionEntryId || !form.amount || !form.reason} onClick={submit}>
           <span className="inline-flex items-center gap-2"><Save size={22} /> Save Damage Entry</span>
         </Button>
       </section>

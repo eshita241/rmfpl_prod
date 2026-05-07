@@ -1,4 +1,4 @@
-import { ActionType, LogEntity } from "@prisma/client";
+import { ActionType, LogEntity, Role } from "@prisma/client";
 import { prisma } from "../config/prisma.js";
 import { AppError, notFound } from "../utils/errors.js";
 import { safeUserSelect } from "../utils/selects.js";
@@ -32,12 +32,47 @@ function calculateQuantity(mouldsUsed: number, mouldCapacity: number, emptySlots
   return Math.max(mouldsUsed * (mouldCapacity - emptySlots), 0);
 }
 
+function todayInIst() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function assertUserCanWriteDate(date: string, role: Role) {
+  if (role === Role.ADMIN) return;
+  if (date.slice(0, 10) !== todayInIst()) {
+    throw new AppError("Only admins can add or change production for previous dates.", 403);
+  }
+}
+
+function isBreadSku(sku: { name: string }) {
+  return /\bbread\b/i.test(sku.name);
+}
+
+async function batchScopeWhere(skuId: string) {
+  const sku = await prisma.sKU.findUnique({ where: { id: skuId } });
+  if (!sku) throw new AppError("Select a valid SKU.", 400);
+
+  return isBreadSku(sku)
+    ? {
+        companyId: sku.companyId,
+        sku: { name: { contains: "bread", mode: "insensitive" as const } }
+      }
+    : { skuId };
+}
+
 export async function nextBatchNumber(date: string, skuId: string, excludeId?: string) {
+  const scopeWhere = await batchScopeWhere(skuId);
   const count = await prisma.productionEntry.count({
     where: {
       date: new Date(date),
-      skuId,
       deletedAt: null,
+      ...scopeWhere,
       ...(excludeId ? { id: { not: excludeId } } : {})
     }
   });
@@ -45,8 +80,9 @@ export async function nextBatchNumber(date: string, skuId: string, excludeId?: s
 }
 
 async function resequenceBatches(date: Date, skuId: string) {
+  const scopeWhere = await batchScopeWhere(skuId);
   const entries = await prisma.productionEntry.findMany({
-    where: { date, skuId, deletedAt: null },
+    where: { date, deletedAt: null, ...scopeWhere },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }]
   });
 
@@ -60,13 +96,13 @@ async function resequenceBatches(date: Date, skuId: string) {
   );
 }
 
-export async function createEntry(input: EntryInput, createdBy: string) {
+export async function createEntry(input: EntryInput, createdBy: string, role: Role) {
+  assertUserCanWriteDate(input.date, role);
   const capacity = await validateCapacity(input);
   const batchNumber = await nextBatchNumber(input.date, input.skuId);
   const entry = await prisma.productionEntry.create({
     data: {
       ...input,
-      shift: "General",
       quantityProduced: capacity.quantityProduced,
       date: new Date(input.date),
       batchNumber,
@@ -104,7 +140,7 @@ export async function listEntries(filters: { startDate?: string; endDate?: strin
       creator: { select: safeUserSelect },
       damageEntries: { where: { deletedAt: null }, orderBy: { createdAt: "asc" } }
     },
-    orderBy: { date: "desc" },
+    orderBy: [{ date: "desc" }, { createdAt: "asc" }, { id: "asc" }],
     take: 500
   });
 }
@@ -132,7 +168,6 @@ export async function updateEntry(id: string, input: EntryInput, performedBy: st
     where: { id },
     data: {
       ...input,
-      shift: "General",
       quantityProduced: capacity.quantityProduced,
       date: new Date(input.date),
       batchNumber,

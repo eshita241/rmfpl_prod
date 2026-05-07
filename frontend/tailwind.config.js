@@ -4,14 +4,14 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: "#1f2933",
-        paper: "#f7fbf4",
-        field: "#ffffff",
-        line: "#cfe5c8",
-        brand: "#1b8a5a",
-        action: "#146c46",
-        fresh: "#71c943",
-        milk: "#eef9e9"
+        ink: "#451817",
+        paper: "#F2E1D3",
+        field: "#F2E1D3",
+        line: "#E7AB6E",
+        brand: "#E7AB6E",
+        action: "#451817",
+        fresh: "#E7AB6E",
+        milk: "#F2E1D3"
       }
     }
   },

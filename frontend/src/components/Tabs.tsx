@@ -29,7 +29,7 @@ export function Tabs({
               key={tab.id}
               onClick={() => onChange(tab.id)}
               className={`flex min-h-14 items-center justify-center gap-2 rounded-md border px-3 text-sm font-bold md:text-base ${
-                current === tab.id ? "border-brand bg-brand text-white" : "border-line bg-field text-ink"
+                current === tab.id ? "border-brand bg-brand text-ink" : "border-line bg-field text-ink"
               }`}
             >
               <Icon size={20} />

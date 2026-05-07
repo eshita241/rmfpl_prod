@@ -31,7 +31,7 @@ export function App() {
 
   const isAdmin = me.data.user.role === "ADMIN";
   const content =
-    tab === "entry" ? <NewEntry /> : tab === "production" ? <ProductionEntries /> : tab === "damages" ? <Damages isAdmin={isAdmin} /> : tab === "reports" ? <Reports isAdmin={isAdmin} /> : tab === "logs" ? <Logs /> : <Admin />;
+    tab === "entry" ? <NewEntry isAdmin={isAdmin} /> : tab === "production" ? <ProductionEntries /> : tab === "damages" ? <Damages isAdmin={isAdmin} /> : tab === "reports" ? <Reports isAdmin={isAdmin} /> : tab === "logs" ? <Logs /> : <Admin />;
 
   return (
     <main className="min-h-screen bg-paper text-ink">

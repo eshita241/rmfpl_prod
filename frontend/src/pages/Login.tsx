@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Factory } from "lucide-react";
 import { login, signup } from "../api/queries";
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
@@ -25,8 +24,7 @@ export function Login() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-paper p-3 sm:p-6">
       <section className="w-full max-w-md rounded-md border border-line bg-field p-5 shadow-sm sm:p-8">
-        <Factory className="mb-5 text-brand" size={42} />
-        <h1 className="text-3xl font-bold text-ink">RMFPL_MGMT</h1>
+        <img className="mb-5 h-auto w-full" src="/logo-rmfpl.png" alt="Rajnandita Milk and Foods ERP" />
         <p className="mt-3 text-base leading-7 text-ink/70">
           Sign in with email and password to record production, view logs, and download reports.
         </p>

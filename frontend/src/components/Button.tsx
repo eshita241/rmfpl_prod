@@ -8,8 +8,8 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 
 export function Button({ active, tone = "quiet", className = "", children, ...props }: ButtonProps) {
   const tones = {
-    primary: "bg-brand text-white border-brand shadow-sm hover:bg-action hover:border-action",
-    quiet: active ? "bg-brand text-white border-brand" : "bg-field text-ink border-line hover:border-brand hover:bg-milk",
+    primary: "bg-brand text-ink border-brand shadow-sm hover:bg-action hover:text-paper hover:border-action",
+    quiet: active ? "bg-brand text-ink border-brand" : "bg-field text-ink border-line hover:border-brand hover:bg-milk",
     danger: "bg-red-600 text-white border-red-600"
   };
 
