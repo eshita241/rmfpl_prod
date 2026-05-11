@@ -11,6 +11,15 @@ import { localDateInputValue } from "../utils/date";
 
 const today = localDateInputValue();
 
+function dateInputWithOffset(dayOffset: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + dayOffset);
+  return localDateInputValue(date);
+}
+
+const allowedStartDate = dateInputWithOffset(-1);
+const allowedEndDate = dateInputWithOffset(1);
+
 type FormState = {
   date: string;
   companyId: string;
@@ -51,14 +60,14 @@ export function NewEntry({ isAdmin }: { isAdmin: boolean }) {
   const selectedSku = useMemo(() => skus.data?.find((sku) => sku.id === form.skuId), [skus.data, form.skuId]);
   const totalCapacity = selectedSku ? Number(form.mouldsUsed || 0) * selectedSku.mouldCapacity : 0;
   const quantityProduced = selectedSku
-    ? Math.max(Number(form.mouldsUsed || 0) * (selectedSku.mouldCapacity - Number(form.emptySlotsPerMould || 0)), 0)
+    ? Math.max(totalCapacity + Number(form.emptySlotsPerMould || 0), 0)
     : 0;
   const nextBatch = useQuery({
     queryKey: ["next-batch", form.date, form.skuId],
     queryFn: () => getNextBatch(form.date, form.skuId),
     enabled: Boolean(form.date && form.skuId)
   });
-  const selectedDateIsClosed = !isAdmin && form.date !== today;
+  const selectedDateIsClosed = !isAdmin && (form.date < allowedStartDate || form.date > allowedEndDate);
 
   const mutation = useMutation({
     mutationFn: createEntry,
@@ -112,12 +121,12 @@ export function NewEntry({ isAdmin }: { isAdmin: boolean }) {
       </div>
 
       <section className="grid gap-4 md:grid-cols-2">
-        <Field label="Date" type="date" error={errors.date} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+        <Field label="Date" type="date" min={isAdmin ? undefined : allowedStartDate} max={isAdmin ? undefined : allowedEndDate} error={errors.date} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
       </section>
 
       {selectedDateIsClosed ? (
         <div className="rounded-md border border-line bg-field p-4 font-semibold text-ink">
-          This day has ended. You can view data and download reports for previous dates, but only admins can add production entries for them.
+          Users can add production entries only for yesterday, today, or tomorrow. Admins can add entries for other dates.
         </div>
       ) : null}
 
@@ -154,8 +163,8 @@ export function NewEntry({ isAdmin }: { isAdmin: boolean }) {
             <p className="mt-2 text-sm text-ink/60">Total moulds in this run</p>
           </div>
           <div>
-        <Field label="Empty Dough Slots" type="number" inputMode="numeric" error={errors.emptySlotsPerMould} value={form.emptySlotsPerMould} onChange={(e) => setForm({ ...form, emptySlotsPerMould: e.target.value })} />
-            <p className="mt-2 text-sm text-ink/60">Slots with only 2/3 dough filled</p>
+            <Field label="Extra Filled Slots" type="number" inputMode="numeric" error={errors.emptySlotsPerMould} value={form.emptySlotsPerMould} onChange={(e) => setForm({ ...form, emptySlotsPerMould: e.target.value })} />
+            <p className="mt-2 text-sm text-ink/60">Additional slots filled beyond complete moulds, e.g. 96 moulds + 1 slot</p>
           </div>
         </div>
         <div className="my-6 border-t border-line" />
@@ -182,7 +191,7 @@ export function NewEntry({ isAdmin }: { isAdmin: boolean }) {
 
       {selectedSku ? (
         <div className="rounded-md border border-line bg-field p-4 font-semibold text-ink">
-          Total capacity: {totalCapacity} pieces. Quantity = moulds used x (pieces per mould - empty slots per mould).
+          Base capacity: {totalCapacity} pieces. Quantity = moulds used x pieces per mould + extra filled slots.
         </div>
       ) : null}
 

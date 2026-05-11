@@ -51,7 +51,7 @@ export function ProductionEntries() {
       <div className="overflow-x-auto rounded-md border border-line bg-field">
         <table className="w-full min-w-[820px] text-left">
           <thead className="bg-milk text-sm uppercase text-ink/70">
-            <tr><th className="p-3">Date</th><th>Created IST</th><th>Company</th><th>Variant</th><th>Batch</th><th>Moulds</th><th>Empty Slots</th><th>Quantity</th></tr>
+            <tr><th className="p-3">Date</th><th>Created IST</th><th>Company</th><th>Variant</th><th>Batch</th><th>Moulds</th><th>Extra Slots</th><th>Quantity</th></tr>
           </thead>
           <tbody>
             {(entries.data ?? []).map((entry) => (

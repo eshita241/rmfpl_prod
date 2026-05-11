@@ -354,7 +354,7 @@ function EntryEditor({
           <Field label="Date" type="date" value={draft.date.slice(0, 10)} onChange={(e) => setDraft({ ...draft, date: e.target.value })} />
           <Field label="Quantity" type="number" value={String(draft.quantityProduced)} onChange={(e) => setDraft({ ...draft, quantityProduced: Number(e.target.value) })} />
           <Field label="Moulds Used" type="number" value={String(draft.mouldsUsed)} onChange={(e) => setDraft({ ...draft, mouldsUsed: Number(e.target.value) })} />
-          <Field label="Empty Slots Per Mould" type="number" value={String(draft.emptySlotsPerMould)} onChange={(e) => setDraft({ ...draft, emptySlotsPerMould: Number(e.target.value) })} />
+          <Field label="Extra Filled Slots" type="number" value={String(draft.emptySlotsPerMould)} onChange={(e) => setDraft({ ...draft, emptySlotsPerMould: Number(e.target.value) })} />
         </div>
         <label className="mt-4 block">
           <span className="mb-2 block text-sm font-semibold text-ink">Notes</span>

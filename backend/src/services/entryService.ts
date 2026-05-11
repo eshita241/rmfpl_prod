@@ -28,25 +28,28 @@ async function validateCapacity(input: EntryInput) {
   };
 }
 
-function calculateQuantity(mouldsUsed: number, mouldCapacity: number, emptySlots: number) {
-  return Math.max(mouldsUsed * (mouldCapacity - emptySlots), 0);
+function calculateQuantity(mouldsUsed: number, mouldCapacity: number, extraFilledSlots: number) {
+  return Math.max(mouldsUsed * mouldCapacity + extraFilledSlots, 0);
 }
 
-function todayInIst() {
+function dateInIst(dayOffset = 0) {
+  const target = new Date(Date.now() + dayOffset * 24 * 60 * 60 * 1000);
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kolkata",
     year: "numeric",
     month: "2-digit",
     day: "2-digit"
-  }).formatToParts(new Date());
+  }).formatToParts(target);
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return `${values.year}-${values.month}-${values.day}`;
 }
 
 function assertUserCanWriteDate(date: string, role: Role) {
   if (role === Role.ADMIN) return;
-  if (date.slice(0, 10) !== todayInIst()) {
-    throw new AppError("Only admins can add or change production for previous dates.", 403);
+  const requestedDate = date.slice(0, 10);
+  const allowedDates = new Set([dateInIst(-1), dateInIst(), dateInIst(1)]);
+  if (!allowedDates.has(requestedDate)) {
+    throw new AppError("Users can add production entries only for yesterday, today, or tomorrow.", 403);
   }
 }
 
