@@ -173,7 +173,7 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
             options={[
               { label: "Select SKU", value: "" },
               ...damageOptions.map((option) => ({
-                label: `${option.skuName} | ${option.companyName} | Produced ${option.totalQuantity} | Remaining ${option.remainingQuantity}`,
+                label: `${option.skuName} | ${option.companyName} | Produced ${option.totalQuantity}`,
                 value: option.key
               }))
             ]}
