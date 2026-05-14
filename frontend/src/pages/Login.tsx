@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { ApiError } from "../api/client";
 import { login, signup } from "../api/queries";
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
@@ -8,6 +9,7 @@ export function Login() {
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
 
   const authMutation = useMutation({
@@ -16,10 +18,29 @@ export function Login() {
         ? login({ email: form.email, password: form.password })
         : signup({ name: form.name, email: form.email, password: form.password }),
     onSuccess: () => {
+      setErrors({});
+      setMessage("");
       queryClient.invalidateQueries({ queryKey: ["me"] });
     },
-    onError: (error) => setMessage(error.message)
+    onError: (error) => {
+      if (error instanceof ApiError && error.issues) {
+        setErrors(fieldErrors(error.issues));
+      }
+      setMessage(error.message);
+    }
   });
+
+  function updateForm(nextForm: typeof form) {
+    setForm(nextForm);
+    setErrors({});
+    setMessage("");
+  }
+
+  function switchMode(nextMode: "login" | "signup") {
+    setMode(nextMode);
+    setErrors({});
+    setMessage("");
+  }
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-paper p-3 sm:p-6">
@@ -30,16 +51,16 @@ export function Login() {
         </p>
 
         <div className="mt-6 grid gap-2 sm:grid-cols-2">
-          <Button active={mode === "login"} onClick={() => setMode("login")}>Login</Button>
-          <Button active={mode === "signup"} onClick={() => setMode("signup")}>Create User</Button>
+          <Button active={mode === "login"} onClick={() => switchMode("login")}>Login</Button>
+          <Button active={mode === "signup"} onClick={() => switchMode("signup")}>Create User</Button>
         </div>
 
         <div className="mt-5 space-y-4">
           {mode === "signup" ? (
-            <Field label="Name" placeholder="Example User" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+            <Field label="Name" placeholder="Example User" error={errors.name} value={form.name} onChange={(event) => updateForm({ ...form, name: event.target.value })} />
           ) : null}
-          <Field label="Email" type="email" placeholder="example@email.com" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
-          <Field label="Password" type="password" placeholder="Example password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} />
+          <Field label="Email" type="email" placeholder="example@email.com" error={errors.email} value={form.email} onChange={(event) => updateForm({ ...form, email: event.target.value })} />
+          <Field label="Password" type="password" placeholder="At least 8 characters" error={errors.password} value={form.password} onChange={(event) => updateForm({ ...form, password: event.target.value })} />
         </div>
 
         {message ? <p className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800">{message}</p> : null}
@@ -51,4 +72,8 @@ export function Login() {
       </section>
     </main>
   );
+}
+
+function fieldErrors(issues: Record<string, string[]>) {
+  return Object.fromEntries(Object.entries(issues).map(([key, value]) => [key, value[0] ?? "Check this field"]));
 }

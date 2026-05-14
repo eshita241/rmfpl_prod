@@ -14,6 +14,7 @@ export const permissionLabels: Record<Permission, string> = {
 export function builtInPermissions(role: Role): Permission[] {
   if (role === Role.ADMIN) return [...permissions];
   if (role === Role.DISPATCH) return ["DISPATCH"];
+  if (role === Role.PENDING) return [];
   return ["PRODUCTION", "REPORTS", "LOGS"];
 }
 
@@ -22,7 +23,8 @@ export function effectivePermissions(user: { role: Role; roleDefinition?: Pick<R
   return normalizePermissions(user.roleDefinition?.permissions ?? builtInPermissions(user.role));
 }
 
-export function effectiveRoleName(user: { role: Role; roleDefinition?: Pick<RoleDefinition, "name"> | null }) {
+export function effectiveRoleName(user: { role: Role; isSuperAdmin?: boolean; roleDefinition?: Pick<RoleDefinition, "name"> | null }) {
+  if (user.isSuperAdmin) return "SUPER ADMIN";
   return user.roleDefinition?.name ?? user.role;
 }
 

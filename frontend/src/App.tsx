@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getMe, logout } from "./api/queries";
+import { Button } from "./components/Button";
 import { AppTab, Sidebar } from "./components/Sidebar";
 import { Admin } from "./pages/Admin";
 import { Damages } from "./pages/Damages";
@@ -14,7 +15,14 @@ import { Reports } from "./pages/Reports";
 export function App() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<AppTab>(() => tabFromHash());
-  const me = useQuery({ queryKey: ["me"], queryFn: getMe, retry: false });
+  const me = useQuery({
+    queryKey: ["me"],
+    queryFn: getMe,
+    retry: false,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchInterval: (query) => (query.state.data?.user ? 5000 : false)
+  });
 
   useEffect(() => {
     const onHashChange = () => setTab(tabFromHash());
@@ -28,9 +36,32 @@ export function App() {
   }
 
   if (me.isLoading) return <main className="min-h-screen bg-paper p-8 text-ink">Loading...</main>;
+  if (me.isError) return <Login />;
   if (!me.data?.user) return <Login />;
 
   const permissions = me.data.user.permissions ?? [];
+  if (permissions.length === 0) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-paper p-4 text-ink">
+        <section className="w-full max-w-lg rounded-md border border-line bg-field p-6 text-center shadow-sm">
+          <img className="mx-auto h-auto w-48" src="/logo-rmfpl.png" alt="Rajnandita Milk and Foods ERP" />
+          <h1 className="mt-6 text-2xl font-bold">Approval pending</h1>
+          <p className="mt-3 text-ink/65">Your account has been created. An admin needs to approve you and assign access before pages are shown.</p>
+          <Button
+            className="mt-6"
+            onClick={async () => {
+              await logout();
+              queryClient.clear();
+              window.location.reload();
+            }}
+          >
+            Sign Out
+          </Button>
+        </section>
+      </main>
+    );
+  }
+
   const isAdmin = permissions.includes("ADMIN");
   const activeTab = tabAllowedForRole(tab, permissions) ? tab : defaultTab(permissions);
   const content =

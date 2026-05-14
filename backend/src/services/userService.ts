@@ -1,6 +1,6 @@
 import { ActionType, LogEntity, Role } from "@prisma/client";
 import { prisma } from "../config/prisma.js";
-import { notFound } from "../utils/errors.js";
+import { AppError, notFound } from "../utils/errors.js";
 import { writeLog } from "./logService.js";
 import { effectivePermissions, effectiveRoleName, normalizePermissions, permissionLabels, permissions } from "./permissionService.js";
 
@@ -9,9 +9,11 @@ const userSelect = {
   name: true,
   email: true,
   role: true,
+  isSuperAdmin: true,
   roleDefinitionId: true,
   roleDefinition: true,
-  createdAt: true
+  createdAt: true,
+  deletedAt: true
 } as const;
 
 type PresentableUser = {
@@ -19,9 +21,11 @@ type PresentableUser = {
   name: string;
   email: string;
   role: Role;
+  isSuperAdmin: boolean;
   roleDefinitionId: string | null;
   roleDefinition?: { name: string; permissions: string[] } | null;
   createdAt: Date;
+  deletedAt?: Date | null;
 };
 
 function presentUser(user: PresentableUser) {
@@ -30,15 +34,18 @@ function presentUser(user: PresentableUser) {
     name: user.name,
     email: user.email,
     role: user.role,
+    isSuperAdmin: user.isSuperAdmin,
     roleDefinitionId: user.roleDefinitionId,
     roleName: effectiveRoleName(user),
     permissions: effectivePermissions(user),
-    createdAt: user.createdAt
+    createdAt: user.createdAt,
+    deletedAt: user.deletedAt ?? null
   };
 }
 
 export async function listUsers() {
   const users = await prisma.user.findMany({
+    where: { deletedAt: null },
     orderBy: { createdAt: "desc" },
     select: userSelect
   });
@@ -46,8 +53,9 @@ export async function listUsers() {
 }
 
 export async function changeUserRole(id: string, input: { role?: Role; roleDefinitionId?: string | null }, performedBy: string) {
-  const previous = await prisma.user.findUnique({ where: { id } });
+  const previous = await prisma.user.findFirst({ where: { id, deletedAt: null } });
   if (!previous) throw notFound("User not found");
+  if (previous.isSuperAdmin) throw new AppError("Super admin role cannot be changed.", 400);
 
   if (input.roleDefinitionId) {
     const roleDefinition = await prisma.roleDefinition.findUnique({ where: { id: input.roleDefinitionId } });
@@ -72,6 +80,29 @@ export async function changeUserRole(id: string, input: { role?: Role; roleDefin
   });
 
   return presentUser(user);
+}
+
+export async function deleteUser(id: string, performedBy: string) {
+  if (id === performedBy) throw new AppError("You cannot delete your own user account.", 400);
+
+  const previous = await prisma.user.findFirst({ where: { id, deletedAt: null }, select: userSelect });
+  if (!previous) throw notFound("User not found");
+  if (previous.isSuperAdmin) throw new AppError("Super admin cannot be deleted.", 400);
+  const deletedAt = new Date();
+
+  await prisma.user.update({
+    where: { id },
+    data: { deletedAt, roleDefinitionId: null }
+  });
+
+  await writeLog({
+    actionType: ActionType.DELETE,
+    entity: LogEntity.USER_ROLE,
+    entityId: id,
+    previousValues: presentUser(previous),
+    newValues: { deletedAt },
+    performedBy
+  });
 }
 
 export function listAvailablePermissions() {

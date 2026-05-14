@@ -1,12 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, Pencil, Plus, X } from "lucide-react";
+import { Archive, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
-import { createRoleDefinition, createSku, deleteSku, getCompanies, getPermissions, getRoleDefinitions, getSkus, getUsers, updateSku, updateUserRole } from "../api/queries";
+import { createRoleDefinition, createSku, deleteSku, deleteUser, getCompanies, getPermissions, getRoleDefinitions, getSkus, getUsers, updateSku, updateUserRole } from "../api/queries";
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
 import { Modal } from "../components/Modal";
 import { SelectField } from "../components/SelectField";
-import type { Permission, Role } from "../types/domain";
+import type { Permission, Role, User } from "../types/domain";
 
 const skuCategoryOptions = [
   { label: "Bread", value: "BREAD" },
@@ -21,11 +21,13 @@ export function Admin() {
   const users = useQuery({ queryKey: ["users"], queryFn: getUsers });
   const roles = useQuery({ queryKey: ["roles"], queryFn: getRoleDefinitions });
   const permissionOptions = useQuery({ queryKey: ["permissions"], queryFn: getPermissions });
+  const me = queryClient.getQueryData<{ user: User }>(["me"]);
   const [skuForm, setSkuForm] = useState({ name: "", companyId: "", category: "OTHER", weight: "", mouldCapacity: "" });
   const [roleForm, setRoleForm] = useState<{ name: string; permissions: Permission[] }>({ name: "", permissions: [] });
   const [editingSkuId, setEditingSkuId] = useState<string | null>(null);
   const [showSkuForm, setShowSkuForm] = useState(false);
   const [skuToDelete, setSkuToDelete] = useState<{ id: string; name: string; company?: string } | null>(null);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   function resetSkuForm() {
     setSkuForm({ name: "", companyId: "", category: "OTHER", weight: "", mouldCapacity: "" });
@@ -60,8 +62,25 @@ export function Admin() {
     mutationFn: ({ id, value }: { id: string; value: string }) =>
       value.startsWith("custom:")
         ? updateUserRole(id, { roleDefinitionId: value.replace("custom:", "") })
-        : updateUserRole(id, { role: value as Role, roleDefinitionId: null }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] })
+        : updateUserRole(id, { role: value as Exclude<Role, "PENDING">, roleDefinitionId: null }),
+    onSuccess: (updatedUser) => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      const currentUser = queryClient.getQueryData<{ user: typeof updatedUser }>(["me"]);
+      if (currentUser?.user.id === updatedUser.id) {
+        queryClient.setQueryData(["me"], { user: updatedUser });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["me"] });
+      }
+    }
+  });
+
+  const userDeleteMutation = useMutation({
+    mutationFn: deleteUser,
+    onSuccess: () => {
+      setUserToDelete(null);
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["logs"] });
+    }
   });
 
   const createRoleMutation = useMutation({
@@ -203,20 +222,29 @@ export function Admin() {
               <span className="min-w-0">
                 <strong>{user.name}</strong><br />
                 <small className="break-all">{user.email}</small>
+                {user.isSuperAdmin ? <span className="ml-2 rounded-md bg-brand px-2 py-1 text-xs font-bold text-ink">Super Admin</span> : null}
+                {user.role === "PENDING" ? <span className="ml-2 rounded-md bg-yellow-100 px-2 py-1 text-xs font-bold text-yellow-800">Pending approval</span> : null}
                 <span className="mt-1 block text-xs font-semibold text-ink/60">{(user.permissions ?? []).join(", ")}</span>
               </span>
-              <SelectField
-                label="Role"
-                value={user.roleDefinitionId ? `custom:${user.roleDefinitionId}` : user.role}
-                onChange={(e) => roleMutation.mutate({ id: user.id, value: e.target.value })}
-                options={[
-                  { label: "USER", value: "USER" },
-                  { label: "DISPATCH", value: "DISPATCH" },
-                  { label: "ADMIN", value: "ADMIN" },
-                  ...(roles.data ?? []).map((role) => ({ label: role.name, value: `custom:${role.id}` }))
-                ]}
-                className="w-full sm:w-56"
-              />
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-end">
+                <SelectField
+                  label="Role"
+                  value={user.roleDefinitionId ? `custom:${user.roleDefinitionId}` : user.role}
+                  disabled={user.isSuperAdmin}
+                  onChange={(e) => roleMutation.mutate({ id: user.id, value: e.target.value })}
+                  options={[
+                    ...(user.role === "PENDING" ? [{ label: "Pending approval", value: "PENDING" }] : []),
+                    { label: "USER", value: "USER" },
+                    { label: "DISPATCH", value: "DISPATCH" },
+                    { label: "ADMIN", value: "ADMIN" },
+                    ...(roles.data ?? []).map((role) => ({ label: role.name, value: `custom:${role.id}` }))
+                  ]}
+                  className="w-full sm:w-56"
+                />
+                <Button tone="danger" disabled={user.id === me?.user.id || user.isSuperAdmin} onClick={() => setUserToDelete(user)}>
+                  <span className="inline-flex items-center gap-2"><Trash2 size={18} /> Delete</span>
+                </Button>
+              </div>
             </div>
           ))}
         </div>
@@ -273,6 +301,26 @@ export function Admin() {
               <Button onClick={() => setSkuToDelete(null)}>Cancel</Button>
               <Button tone="danger" disabled={deleteMutation.isPending} onClick={() => deleteMutation.mutate(skuToDelete.id)}>
                 Yes, Archive
+              </Button>
+            </div>
+          }
+        />
+      ) : null}
+
+      {userToDelete ? (
+        <Modal
+          title="Delete user?"
+          description={
+            <>
+              This will remove <strong>{userToDelete.name}</strong> from active access. Their old production, dispatch, damage, and log history will remain in reports.
+            </>
+          }
+          icon={<Trash2 className="text-red-700" size={30} />}
+          actions={
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Button onClick={() => setUserToDelete(null)}>Cancel</Button>
+              <Button tone="danger" disabled={userDeleteMutation.isPending} onClick={() => userDeleteMutation.mutate(userToDelete.id)}>
+                Yes, Delete
               </Button>
             </div>
           }

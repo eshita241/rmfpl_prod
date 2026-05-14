@@ -69,8 +69,9 @@ export const getDispatchProductionTotals = (startDate?: string, endDate?: string
 };
 export const getLogs = (date?: string) => api<Log[]>(`/logs${date ? `?date=${date}` : ""}`);
 export const getUsers = () => api<User[]>("/users");
-export const updateUserRole = (id: string, body: { role?: Role; roleDefinitionId?: string | null }) =>
+export const updateUserRole = (id: string, body: { role?: Exclude<Role, "PENDING">; roleDefinitionId?: string | null }) =>
   api<User>(`/users/${id}/role`, { method: "PATCH", body: JSON.stringify(body) });
+export const deleteUser = (id: string) => api<void>(`/users/${id}`, { method: "DELETE" });
 export const getRoleDefinitions = () => api<RoleDefinition[]>("/roles");
 export const createRoleDefinition = (body: { name: string; permissions: Permission[] }) =>
   api<RoleDefinition>("/roles", { method: "POST", body: JSON.stringify(body) });

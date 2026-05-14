@@ -1,4 +1,4 @@
-export type Role = "ADMIN" | "USER" | "DISPATCH";
+export type Role = "PENDING" | "ADMIN" | "USER" | "DISPATCH";
 export type Permission = "PRODUCTION" | "DISPATCH" | "REPORTS" | "LOGS" | "ADMIN";
 
 export type User = {
@@ -6,10 +6,12 @@ export type User = {
   name: string;
   email: string;
   role: Role;
+  isSuperAdmin?: boolean;
   roleName?: string;
   roleDefinitionId?: string | null;
   permissions?: Permission[];
   createdAt?: string;
+  deletedAt?: string | null;
 };
 
 export type RoleDefinition = {

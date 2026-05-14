@@ -28,15 +28,16 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
     const decoded = jwt.verify(token, env.jwtSecret) as JwtPayload;
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      select: { id: true, name: true, email: true, role: true, roleDefinitionId: true, roleDefinition: true }
+      select: { id: true, name: true, email: true, role: true, isSuperAdmin: true, roleDefinitionId: true, roleDefinition: true, deletedAt: true }
     });
 
-    if (!user) throw new AppError("Your session is no longer valid.", 401);
+    if (!user || user.deletedAt) throw new AppError("Your session is no longer valid.", 401);
     req.user = {
       id: user.id,
       name: user.name,
       email: user.email,
       role: user.role,
+      isSuperAdmin: user.isSuperAdmin,
       roleDefinitionId: user.roleDefinitionId,
       roleName: effectiveRoleName(user),
       permissions: effectivePermissions(user)

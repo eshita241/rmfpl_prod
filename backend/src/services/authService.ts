@@ -11,6 +11,7 @@ function authUser(user: Awaited<ReturnType<typeof prisma.user.findUnique>> & { r
     name: user.name,
     email: user.email,
     role: user.role,
+    isSuperAdmin: user.isSuperAdmin,
     roleDefinitionId: user.roleDefinitionId,
     roleName: effectiveRoleName(user),
     permissions: effectivePermissions(user)
@@ -23,7 +24,7 @@ export async function loginWithPassword(email: string, password: string) {
     include: { roleDefinition: true }
   });
 
-  if (!user?.passwordHash) {
+  if (!user?.passwordHash || user.deletedAt) {
     throw new AppError("Email or password is incorrect.", 401);
   }
 
@@ -54,7 +55,7 @@ export async function createPasswordUser(input: {
       name: input.name,
       email: input.email.toLowerCase(),
       passwordHash,
-      role: Role.USER
+      role: Role.PENDING
     }
   });
 

@@ -4,7 +4,7 @@ import { getDamages, postDamage, putDamage, removeDamage } from "../controllers/
 import { getDispatches, getDispatchProductionTotals, postDispatch } from "../controllers/dispatchController.js";
 import { getEntries, getNextBatch, postEntry, putEntry, removeEntry } from "../controllers/entryController.js";
 import { getSkus, postSku, putSku, removeSku } from "../controllers/skuController.js";
-import { getPermissions, getRoleDefinitions, getUsers, patchUserRole, postRoleDefinition } from "../controllers/userController.js";
+import { getPermissions, getRoleDefinitions, getUsers, patchUserRole, postRoleDefinition, removeUser } from "../controllers/userController.js";
 import { requireAuth, requirePermission } from "../middleware/auth.js";
 import { authRoutes } from "./authRoutes.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -38,6 +38,7 @@ routes.get("/reports", requirePermission("REPORTS"), asyncHandler(getReport));
 routes.get("/download-app", asyncHandler(downloadApp));
 routes.get("/users", requirePermission("ADMIN"), asyncHandler(getUsers));
 routes.patch("/users/:id/role", requirePermission("ADMIN"), asyncHandler(patchUserRole));
+routes.delete("/users/:id", requirePermission("ADMIN"), asyncHandler(removeUser));
 routes.get("/roles", requirePermission("ADMIN"), asyncHandler(getRoleDefinitions));
 routes.post("/roles", requirePermission("ADMIN"), asyncHandler(postRoleDefinition));
 routes.get("/permissions", requirePermission("ADMIN"), asyncHandler(getPermissions));

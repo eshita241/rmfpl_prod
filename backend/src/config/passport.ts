@@ -1,5 +1,6 @@
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
+import { Role } from "@prisma/client";
 import { env } from "./env.js";
 import { prisma } from "./prisma.js";
 import { effectivePermissions, effectiveRoleName } from "../services/permissionService.js";
@@ -22,7 +23,7 @@ if (isGoogleAuthConfigured) {
           const user = await prisma.user.upsert({
             where: { email },
             update: { name: profile.displayName },
-            create: { email, name: profile.displayName },
+            create: { email, name: profile.displayName, role: Role.PENDING },
             include: { roleDefinition: true }
           });
 
@@ -31,6 +32,7 @@ if (isGoogleAuthConfigured) {
             name: user.name,
             email: user.email,
             role: user.role,
+            isSuperAdmin: user.isSuperAdmin,
             roleDefinitionId: user.roleDefinitionId,
             roleName: effectiveRoleName(user),
             permissions: effectivePermissions(user)
