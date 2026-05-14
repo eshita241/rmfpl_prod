@@ -6,7 +6,7 @@ import { Button } from "../components/Button";
 import { Field } from "../components/Field";
 import { Modal } from "../components/Modal";
 import { SelectField } from "../components/SelectField";
-import type { DamageEntry } from "../types/domain";
+import type { DamageEntry, ProductionEntry } from "../types/domain";
 import { formatIst } from "../utils/time";
 import { ApiError } from "../api/client";
 import { localDateInputValue } from "../utils/date";
@@ -19,6 +19,26 @@ type SavedDamage = {
   companyName: string;
   skuName: string;
   date: string;
+};
+
+type DamageOption = {
+  key: string;
+  companyName: string;
+  skuName: string;
+  totalQuantity: number;
+  damagedQuantity: number;
+  remainingQuantity: number;
+  entries: ProductionEntry[];
+};
+
+type DamageSummary = {
+  key: string;
+  amount: number;
+  companyName: string;
+  skuName: string;
+  reason: string;
+  createdAt: string;
+  entries: DamageEntry[];
 };
 
 export function Damages({ isAdmin }: { isAdmin: boolean }) {
@@ -43,18 +63,22 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
     enabled: Boolean(damageToEdit)
   });
   const damages = useQuery({ queryKey: ["damages", form.date], queryFn: () => getDamages(form.date, form.date) });
-  const selectedEntry = entries.data?.find((entry) => entry.id === form.productionEntryId);
+  const damageOptions = buildDamageOptions(entries.data ?? []);
+  const selectedOption = damageOptions.find((option) => option.key === form.productionEntryId);
+  const damageSummaries = buildDamageSummaries(damages.data ?? []);
   const selectedDateIsClosed = !isAdmin && form.date !== today;
 
   const mutation = useMutation({
-    mutationFn: createDamage,
-    onSuccess: (damage) => {
+    mutationFn: createDailySkuDamage,
+    onSuccess: (createdDamages) => {
+      const firstDamage = createdDamages[0];
+      if (!firstDamage) return;
       setSavedDamage({
-        amount: damage.amount,
-        batch: damageBatchLabel(damage),
-        companyName: damage.company.name,
-        skuName: damage.sku.name,
-        date: damage.date.slice(0, 10)
+        amount: createdDamages.reduce((total, damage) => total + damage.amount, 0),
+        batch: "Daily SKU total",
+        companyName: firstDamage.company.name,
+        skuName: firstDamage.sku.name,
+        date: firstDamage.date.slice(0, 10)
       });
       setForm((current) => ({ ...current, amount: "", reason: "" }));
       queryClient.invalidateQueries({ queryKey: ["damages"] });
@@ -92,20 +116,23 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
   function submit() {
     setErrors({});
     const amount = Number(form.amount);
-    const alreadyDamaged =
-      selectedEntry?.damageEntries?.reduce((total, damage) => total + damage.amount, 0) ?? 0;
-    const remaining = selectedEntry ? selectedEntry.quantityProduced - alreadyDamaged : 0;
+    const alreadyDamaged = selectedOption?.damagedQuantity ?? 0;
+    const remaining = selectedOption?.remainingQuantity ?? 0;
 
-    if (selectedEntry && amount > remaining) {
+    if (selectedOption && amount > remaining) {
       setErrorModal(
-        `Damage quantity cannot be more than production quantity. Produced: ${selectedEntry.quantityProduced}. Already damaged: ${alreadyDamaged}. Remaining allowed: ${Math.max(remaining, 0)}.`
+        `Damage quantity cannot be more than production quantity. Produced: ${selectedOption.totalQuantity}. Already damaged: ${alreadyDamaged}. Remaining allowed: ${Math.max(remaining, 0)}.`
       );
       return;
     }
 
+    if (!selectedOption) return;
+
     mutation.mutate({
-      ...form,
-      amount
+      date: form.date,
+      option: selectedOption,
+      amount,
+      reason: form.reason
     });
   }
 
@@ -123,7 +150,7 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-ink">Damages</h2>
-        <p className="text-ink/65">Record damaged quantity against the correct production batch.</p>
+        <p className="text-ink/65">Record damaged quantity against the SKU total for the selected day.</p>
       </div>
 
       <section className="rounded-md border border-line bg-field p-4 shadow-sm">
@@ -140,14 +167,14 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
 
         <div className="mt-5">
           <SelectField
-            label="Production Entry"
+            label="SKU Produced Today"
             value={form.productionEntryId}
             onChange={(e) => setForm({ ...form, productionEntryId: e.target.value })}
             options={[
-              { label: "Select production entry", value: "" },
-              ...(entries.data ?? []).map((entry) => ({
-                label: `${entry.sku.name} | Batch ${entry.batchNumber} | ${entry.company.name} | Produced ${entry.quantityProduced}`,
-                value: entry.id
+              { label: "Select SKU", value: "" },
+              ...damageOptions.map((option) => ({
+                label: `${option.skuName} | ${option.companyName} | Produced ${option.totalQuantity} | Remaining ${option.remainingQuantity}`,
+                value: option.key
               }))
             ]}
           />
@@ -166,9 +193,9 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
           </label>
         </div>
 
-        {selectedEntry ? (
+        {selectedOption ? (
           <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4 font-semibold text-amber-900">
-            Recording damage for {selectedEntry.sku.name}, Batch {selectedEntry.batchNumber}, {selectedEntry.company.name}. Remaining allowed: {remainingDamage(selectedEntry)}.
+            Recording damage for {selectedOption.skuName}, {selectedOption.companyName}. Total produced: {selectedOption.totalQuantity}. Remaining allowed: {selectedOption.remainingQuantity}.
           </div>
         ) : null}
 
@@ -180,18 +207,18 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
       <section>
         <h3 className="mb-3 text-lg font-bold text-ink">Today / Selected Date</h3>
         <div className="grid gap-3 md:grid-cols-2">
-          {(damages.data ?? []).map((damage) => (
-            <article key={damage.id} className="rounded-md border border-line bg-field p-4">
+          {damageSummaries.map((summary) => (
+            <article key={summary.key} className="rounded-md border border-line bg-field p-4">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="mt-1 text-action" size={24} />
                 <div>
-                  <strong>{damage.amount} damaged | {damage.sku.name}</strong>
-                  <p className="text-sm text-ink/65">{damage.company.name} | {damageBatchLabel(damage)} | {formatIst(damage.createdAt)}</p>
-                  <p className="mt-2 text-sm">{damage.reason}</p>
-                  {isAdmin ? (
+                  <strong>{summary.amount} damaged | {summary.skuName}</strong>
+                  <p className="text-sm text-ink/65">{summary.companyName} | {formatIst(summary.createdAt)}</p>
+                  <p className="mt-2 text-sm">{summary.reason}</p>
+                  {isAdmin && summary.entries.length === 1 ? (
                     <div className="mt-3 flex gap-2">
-                      <Button onClick={() => startEdit(damage)}><Pencil size={18} /></Button>
-                      <Button tone="danger" onClick={() => setDamageToArchive(damage)}><Archive size={18} /></Button>
+                      <Button onClick={() => startEdit(summary.entries[0])}><Pencil size={18} /></Button>
+                      <Button tone="danger" onClick={() => setDamageToArchive(summary.entries[0])}><Archive size={18} /></Button>
                     </div>
                   ) : null}
                 </div>
@@ -204,7 +231,7 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
       {savedDamage ? (
         <Modal
           title="Damage Entry Saved"
-          description="The damaged quantity has been recorded against the selected production batch."
+          description="The damaged quantity has been recorded against the selected SKU total."
           icon={<CheckCircle2 className="text-brand" size={30} />}
           actions={<Button className="w-full" tone="primary" onClick={() => setSavedDamage(null)}>Done</Button>}
         >
@@ -308,6 +335,92 @@ function remainingDamage(entry: {
   return Math.max(entry.quantityProduced - damaged, 0);
 }
 
-function damageBatchLabel(damage: DamageEntry) {
-  return damage.productionEntry?.batchNumber ? `Batch ${damage.productionEntry.batchNumber}` : "Batch -";
+function buildDamageOptions(entries: ProductionEntry[]): DamageOption[] {
+  const options = new Map<string, DamageOption>();
+
+  entries.forEach((entry) => {
+    const key = `${entry.date.slice(0, 10)}:${entry.companyId}:${entry.skuId}`;
+    const existing = options.get(key);
+    const damaged = entry.damageEntries?.reduce((total, damage) => total + damage.amount, 0) ?? 0;
+
+    if (existing) {
+      existing.totalQuantity += entry.quantityProduced;
+      existing.damagedQuantity += damaged;
+      existing.remainingQuantity += Math.max(entry.quantityProduced - damaged, 0);
+      existing.entries.push(entry);
+      return;
+    }
+
+    options.set(key, {
+      key,
+      companyName: entry.company.name,
+      skuName: entry.sku.name,
+      totalQuantity: entry.quantityProduced,
+      damagedQuantity: damaged,
+      remainingQuantity: Math.max(entry.quantityProduced - damaged, 0),
+      entries: [entry]
+    });
+  });
+
+  return [...options.values()].sort((first, second) => {
+    const company = first.companyName.localeCompare(second.companyName);
+    return company || first.skuName.localeCompare(second.skuName);
+  });
+}
+
+function buildDamageSummaries(damages: DamageEntry[]): DamageSummary[] {
+  const summaries = new Map<string, DamageSummary>();
+
+  damages.forEach((damage) => {
+    const key = `${damage.date.slice(0, 10)}:${damage.companyId}:${damage.skuId}:${damage.reason}`;
+    const existing = summaries.get(key);
+
+    if (existing) {
+      existing.amount += damage.amount;
+      existing.entries.push(damage);
+      if (damage.createdAt < existing.createdAt) existing.createdAt = damage.createdAt;
+      return;
+    }
+
+    summaries.set(key, {
+      key,
+      amount: damage.amount,
+      companyName: damage.company.name,
+      skuName: damage.sku.name,
+      reason: damage.reason,
+      createdAt: damage.createdAt,
+      entries: [damage]
+    });
+  });
+
+  return [...summaries.values()].sort((first, second) => second.createdAt.localeCompare(first.createdAt));
+}
+
+async function createDailySkuDamage(input: { date: string; option: DamageOption; amount: number; reason: string }) {
+  let remainingToAllocate = input.amount;
+  const createdDamages: DamageEntry[] = [];
+
+  for (const entry of input.option.entries) {
+    const entryRemaining = remainingDamage(entry);
+    const amount = Math.min(remainingToAllocate, entryRemaining);
+    if (amount <= 0) continue;
+
+    createdDamages.push(
+      await createDamage({
+        date: input.date,
+        productionEntryId: entry.id,
+        amount,
+        reason: input.reason
+      })
+    );
+    remainingToAllocate -= amount;
+
+    if (remainingToAllocate === 0) break;
+  }
+
+  if (remainingToAllocate > 0) {
+    throw new Error(`Damage quantity cannot exceed remaining production quantity. Remaining allowed: ${input.option.remainingQuantity}.`);
+  }
+
+  return createdDamages;
 }
