@@ -25,7 +25,7 @@ export const deleteEntry = (id: string) => api<void>(`/entries/${id}`, { method:
 export const getNextBatch = (date: string, skuId: string) =>
   api<{ batchNumber: number }>(`/entries/next-batch?date=${date}&skuId=${skuId}`);
 export const createDamage = (body: unknown) =>
-  api<DamageEntry>("/damages", {
+  api<DamageEntry[]>("/damages", {
     method: "POST",
     body: JSON.stringify(body)
   });

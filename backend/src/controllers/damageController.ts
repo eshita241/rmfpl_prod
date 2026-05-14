@@ -3,7 +3,15 @@ import { z } from "zod";
 import { createDamage, deleteDamage, listDamages, updateDamage } from "../services/damageService.js";
 import { param } from "../utils/request.js";
 
-const damageSchema = z.object({
+const createDamageSchema = z.object({
+  date: z.string().min(10),
+  companyId: z.string().min(1),
+  skuId: z.string().min(1),
+  amount: z.coerce.number().int().positive(),
+  reason: z.string().min(2)
+});
+
+const updateDamageSchema = z.object({
   date: z.string().min(10),
   productionEntryId: z.string().min(1),
   amount: z.coerce.number().int().positive(),
@@ -11,8 +19,8 @@ const damageSchema = z.object({
 });
 
 export async function postDamage(req: Request, res: Response) {
-  const damage = await createDamage(damageSchema.parse(req.body), req.user!.id, req.user!.role);
-  res.status(201).json(damage);
+  const damages = await createDamage(createDamageSchema.parse(req.body), req.user!.id, req.user!.role);
+  res.status(201).json(damages);
 }
 
 export async function getDamages(req: Request, res: Response) {
@@ -25,7 +33,7 @@ export async function getDamages(req: Request, res: Response) {
 }
 
 export async function putDamage(req: Request, res: Response) {
-  res.json(await updateDamage(param(req, "id"), damageSchema.parse(req.body), req.user!.id));
+  res.json(await updateDamage(param(req, "id"), updateDamageSchema.parse(req.body), req.user!.id));
 }
 
 export async function removeDamage(req: Request, res: Response) {

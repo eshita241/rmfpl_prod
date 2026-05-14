@@ -23,12 +23,13 @@ type SavedDamage = {
 
 type DamageOption = {
   key: string;
+  companyId: string;
+  skuId: string;
   companyName: string;
   skuName: string;
   totalQuantity: number;
   damagedQuantity: number;
   remainingQuantity: number;
-  entries: ProductionEntry[];
 };
 
 type DamageSummary = {
@@ -45,7 +46,7 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState({
     date: today,
-    productionEntryId: "",
+    damageOptionKey: "",
     amount: "",
     reason: ""
   });
@@ -64,12 +65,12 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
   });
   const damages = useQuery({ queryKey: ["damages", form.date], queryFn: () => getDamages(form.date, form.date) });
   const damageOptions = buildDamageOptions(entries.data ?? []);
-  const selectedOption = damageOptions.find((option) => option.key === form.productionEntryId);
+  const selectedOption = damageOptions.find((option) => option.key === form.damageOptionKey);
   const damageSummaries = buildDamageSummaries(damages.data ?? []);
   const selectedDateIsClosed = !isAdmin && form.date !== today;
 
   const mutation = useMutation({
-    mutationFn: createDailySkuDamage,
+    mutationFn: createDamage,
     onSuccess: (createdDamages) => {
       const firstDamage = createdDamages[0];
       if (!firstDamage) return;
@@ -130,7 +131,8 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
 
     mutation.mutate({
       date: form.date,
-      option: selectedOption,
+      companyId: selectedOption.companyId,
+      skuId: selectedOption.skuId,
       amount,
       reason: form.reason
     });
@@ -168,8 +170,8 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
         <div className="mt-5">
           <SelectField
             label="SKU Produced Today"
-            value={form.productionEntryId}
-            onChange={(e) => setForm({ ...form, productionEntryId: e.target.value })}
+            value={form.damageOptionKey}
+            onChange={(e) => setForm({ ...form, damageOptionKey: e.target.value })}
             options={[
               { label: "Select SKU", value: "" },
               ...damageOptions.map((option) => ({
@@ -199,7 +201,7 @@ export function Damages({ isAdmin }: { isAdmin: boolean }) {
           </div>
         ) : null}
 
-        <Button tone="primary" className="mt-5 w-full text-lg" disabled={selectedDateIsClosed || mutation.isPending || !form.productionEntryId || !form.amount || !form.reason} onClick={submit}>
+        <Button tone="primary" className="mt-5 w-full text-lg" disabled={selectedDateIsClosed || mutation.isPending || !form.damageOptionKey || !form.amount || !form.reason} onClick={submit}>
           <span className="inline-flex items-center gap-2"><Save size={22} /> Save Damage Entry</span>
         </Button>
       </section>
@@ -347,18 +349,18 @@ function buildDamageOptions(entries: ProductionEntry[]): DamageOption[] {
       existing.totalQuantity += entry.quantityProduced;
       existing.damagedQuantity += damaged;
       existing.remainingQuantity += Math.max(entry.quantityProduced - damaged, 0);
-      existing.entries.push(entry);
       return;
     }
 
     options.set(key, {
       key,
+      companyId: entry.companyId,
+      skuId: entry.skuId,
       companyName: entry.company.name,
       skuName: entry.sku.name,
       totalQuantity: entry.quantityProduced,
       damagedQuantity: damaged,
-      remainingQuantity: Math.max(entry.quantityProduced - damaged, 0),
-      entries: [entry]
+      remainingQuantity: Math.max(entry.quantityProduced - damaged, 0)
     });
   });
 
@@ -394,33 +396,4 @@ function buildDamageSummaries(damages: DamageEntry[]): DamageSummary[] {
   });
 
   return [...summaries.values()].sort((first, second) => second.createdAt.localeCompare(first.createdAt));
-}
-
-async function createDailySkuDamage(input: { date: string; option: DamageOption; amount: number; reason: string }) {
-  let remainingToAllocate = input.amount;
-  const createdDamages: DamageEntry[] = [];
-
-  for (const entry of input.option.entries) {
-    const entryRemaining = remainingDamage(entry);
-    const amount = Math.min(remainingToAllocate, entryRemaining);
-    if (amount <= 0) continue;
-
-    createdDamages.push(
-      await createDamage({
-        date: input.date,
-        productionEntryId: entry.id,
-        amount,
-        reason: input.reason
-      })
-    );
-    remainingToAllocate -= amount;
-
-    if (remainingToAllocate === 0) break;
-  }
-
-  if (remainingToAllocate > 0) {
-    throw new Error(`Damage quantity cannot exceed remaining production quantity. Remaining allowed: ${input.option.remainingQuantity}.`);
-  }
-
-  return createdDamages;
 }
