@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Archive, Pencil, Plus, X } from "lucide-react";
 import { useState } from "react";
-import { createSku, deleteSku, getCompanies, getSkus, getUsers, updateSku, updateUserRole } from "../api/queries";
+import { createRoleDefinition, createSku, deleteSku, getCompanies, getPermissions, getRoleDefinitions, getSkus, getUsers, updateSku, updateUserRole } from "../api/queries";
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
 import { Modal } from "../components/Modal";
 import { SelectField } from "../components/SelectField";
+import type { Permission, Role } from "../types/domain";
 
 const skuCategoryOptions = [
   { label: "Bread", value: "BREAD" },
@@ -18,7 +19,10 @@ export function Admin() {
   const companies = useQuery({ queryKey: ["companies"], queryFn: getCompanies });
   const skus = useQuery({ queryKey: ["skus", "admin"], queryFn: () => getSkus(undefined, true) });
   const users = useQuery({ queryKey: ["users"], queryFn: getUsers });
+  const roles = useQuery({ queryKey: ["roles"], queryFn: getRoleDefinitions });
+  const permissionOptions = useQuery({ queryKey: ["permissions"], queryFn: getPermissions });
   const [skuForm, setSkuForm] = useState({ name: "", companyId: "", category: "OTHER", weight: "", mouldCapacity: "" });
+  const [roleForm, setRoleForm] = useState<{ name: string; permissions: Permission[] }>({ name: "", permissions: [] });
   const [editingSkuId, setEditingSkuId] = useState<string | null>(null);
   const [showSkuForm, setShowSkuForm] = useState(false);
   const [skuToDelete, setSkuToDelete] = useState<{ id: string; name: string; company?: string } | null>(null);
@@ -53,8 +57,19 @@ export function Admin() {
   });
 
   const roleMutation = useMutation({
-    mutationFn: ({ id, role }: { id: string; role: "ADMIN" | "USER" }) => updateUserRole(id, role),
+    mutationFn: ({ id, value }: { id: string; value: string }) =>
+      value.startsWith("custom:")
+        ? updateUserRole(id, { roleDefinitionId: value.replace("custom:", "") })
+        : updateUserRole(id, { role: value as Role, roleDefinitionId: null }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] })
+  });
+
+  const createRoleMutation = useMutation({
+    mutationFn: createRoleDefinition,
+    onSuccess: () => {
+      setRoleForm({ name: "", permissions: [] });
+      queryClient.invalidateQueries({ queryKey: ["roles"] });
+    }
   });
 
   return (
@@ -185,17 +200,60 @@ export function Admin() {
         <div className="mt-3 space-y-3">
           {(users.data ?? []).map((user) => (
             <div key={user.id} className="flex flex-col gap-3 rounded-md border border-line p-3 sm:flex-row sm:items-center sm:justify-between">
-              <span className="min-w-0"><strong>{user.name}</strong><br /><small className="break-all">{user.email}</small></span>
+              <span className="min-w-0">
+                <strong>{user.name}</strong><br />
+                <small className="break-all">{user.email}</small>
+                <span className="mt-1 block text-xs font-semibold text-ink/60">{(user.permissions ?? []).join(", ")}</span>
+              </span>
               <SelectField
                 label="Role"
-                value={user.role}
-                onChange={(e) => roleMutation.mutate({ id: user.id, role: e.target.value as "ADMIN" | "USER" })}
+                value={user.roleDefinitionId ? `custom:${user.roleDefinitionId}` : user.role}
+                onChange={(e) => roleMutation.mutate({ id: user.id, value: e.target.value })}
                 options={[
                   { label: "USER", value: "USER" },
-                  { label: "ADMIN", value: "ADMIN" }
+                  { label: "DISPATCH", value: "DISPATCH" },
+                  { label: "ADMIN", value: "ADMIN" },
+                  ...(roles.data ?? []).map((role) => ({ label: role.name, value: `custom:${role.id}` }))
                 ]}
-                className="w-full sm:w-40"
+                className="w-full sm:w-56"
               />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-md border border-line bg-field p-4">
+        <h3 className="text-lg font-bold text-ink">Custom Roles</h3>
+        <div className="mt-4 rounded-md border border-line bg-paper p-4">
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
+            <Field label="Role Name" value={roleForm.name} onChange={(e) => setRoleForm({ ...roleForm, name: e.target.value })} />
+            <Button className="self-end" tone="primary" disabled={!roleForm.name || roleForm.permissions.length === 0 || createRoleMutation.isPending} onClick={() => createRoleMutation.mutate(roleForm)}>
+              <span className="inline-flex items-center gap-2"><Plus size={18} /> Add Role</span>
+            </Button>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {(permissionOptions.data ?? []).map((permission) => (
+              <label key={permission.id} className="flex items-center gap-3 rounded-md border border-line bg-milk p-3 font-semibold text-ink">
+                <input
+                  type="checkbox"
+                  checked={roleForm.permissions.includes(permission.id)}
+                  onChange={(e) => {
+                    const permissions = e.target.checked
+                      ? [...roleForm.permissions, permission.id]
+                      : roleForm.permissions.filter((item) => item !== permission.id);
+                    setRoleForm({ ...roleForm, permissions });
+                  }}
+                />
+                {permission.label}
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          {(roles.data ?? []).map((role) => (
+            <div key={role.id} className="rounded-md border border-line bg-milk p-3">
+              <strong>{role.name}</strong>
+              <div className="mt-1 text-sm font-semibold text-ink/60">{role.permissions.join(", ")}</div>
             </div>
           ))}
         </div>

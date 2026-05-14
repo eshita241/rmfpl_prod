@@ -21,6 +21,7 @@ const companies = [
 async function main() {
   const adminPasswordHash = await bcrypt.hash("admin12345", 12);
   const userPasswordHash = await bcrypt.hash("user12345", 12);
+  const dispatchPasswordHash = await bcrypt.hash("dispatch12345", 12);
 
   for (const company of companies) {
     const savedCompany = await prisma.company.upsert({
@@ -57,6 +58,17 @@ async function main() {
       email: "user@example.com",
       passwordHash: userPasswordHash,
       role: Role.USER
+    }
+  });
+
+  await prisma.user.upsert({
+    where: { email: "dispatch@example.com" },
+    update: { role: Role.DISPATCH, passwordHash: dispatchPasswordHash },
+    create: {
+      name: "Dispatch User",
+      email: "dispatch@example.com",
+      passwordHash: dispatchPasswordHash,
+      role: Role.DISPATCH
     }
   });
 }

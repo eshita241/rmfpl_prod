@@ -1,11 +1,28 @@
-export type Role = "ADMIN" | "USER";
+export type Role = "ADMIN" | "USER" | "DISPATCH";
+export type Permission = "PRODUCTION" | "DISPATCH" | "REPORTS" | "LOGS" | "ADMIN";
 
 export type User = {
   id: string;
   name: string;
   email: string;
   role: Role;
+  roleName?: string;
+  roleDefinitionId?: string | null;
+  permissions?: Permission[];
   createdAt?: string;
+};
+
+export type RoleDefinition = {
+  id: string;
+  name: string;
+  permissions: Permission[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PermissionOption = {
+  id: Permission;
+  label: string;
 };
 
 export type Company = {
@@ -64,10 +81,39 @@ export type DamageEntry = {
   deletedAt?: string | null;
 };
 
+export type DispatchEntry = {
+  id: string;
+  date: string;
+  companyId: string;
+  skuId: string;
+  quantity: number;
+  carNumber: string;
+  sealNumber?: string | null;
+  cratesSent: number;
+  cratesReceived: number;
+  company: Company;
+  sku: Sku;
+  creator?: User;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+};
+
+export type ProductionTotal = {
+  date: string;
+  companyId: string;
+  skuId: string;
+  quantityProduced: number;
+  quantityDispatched: number;
+  quantityRemaining: number;
+  company?: Company;
+  sku?: Sku;
+};
+
 export type Log = {
   id: string;
   actionType: "CREATE" | "UPDATE" | "DELETE";
-  entity: "SKU" | "ENTRY" | "DAMAGE" | "USER_ROLE";
+  entity: "SKU" | "ENTRY" | "DAMAGE" | "DISPATCH" | "USER_ROLE";
   entityId: string;
   changes: {
     previousValues: unknown;

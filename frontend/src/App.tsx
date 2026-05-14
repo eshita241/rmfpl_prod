@@ -4,6 +4,7 @@ import { getMe, logout } from "./api/queries";
 import { AppTab, Sidebar } from "./components/Sidebar";
 import { Admin } from "./pages/Admin";
 import { Damages } from "./pages/Damages";
+import { Dispatch } from "./pages/Dispatch";
 import { Logs } from "./pages/Logs";
 import { Login } from "./pages/Login";
 import { NewEntry } from "./pages/NewEntry";
@@ -29,18 +30,21 @@ export function App() {
   if (me.isLoading) return <main className="min-h-screen bg-paper p-8 text-ink">Loading...</main>;
   if (!me.data?.user) return <Login />;
 
-  const isAdmin = me.data.user.role === "ADMIN";
+  const permissions = me.data.user.permissions ?? [];
+  const isAdmin = permissions.includes("ADMIN");
+  const activeTab = tabAllowedForRole(tab, permissions) ? tab : defaultTab(permissions);
   const content =
-    tab === "entry" ? <NewEntry isAdmin={isAdmin} /> : tab === "production" ? <ProductionEntries /> : tab === "damages" ? <Damages isAdmin={isAdmin} /> : tab === "reports" ? <Reports isAdmin={isAdmin} /> : tab === "logs" ? <Logs /> : <Admin />;
+    activeTab === "entry" ? <NewEntry isAdmin={isAdmin} /> : activeTab === "production" ? <ProductionEntries /> : activeTab === "damages" ? <Damages isAdmin={isAdmin} /> : activeTab === "dispatch" ? <Dispatch /> : activeTab === "reports" ? <Reports isAdmin={isAdmin} /> : activeTab === "logs" ? <Logs /> : <Admin />;
 
   return (
     <main className="min-h-screen bg-paper text-ink">
       <Sidebar
-        current={tab}
+        current={activeTab}
         onChange={changeTab}
         isAdmin={isAdmin}
         userName={me.data.user.name}
-        role={me.data.user.role}
+        role={me.data.user.roleName ?? me.data.user.role}
+        permissions={permissions}
         onLogout={async () => {
           await logout();
           queryClient.clear();
@@ -54,5 +58,22 @@ export function App() {
 
 function tabFromHash(): AppTab {
   const hash = window.location.hash.replace("#", "");
-  return ["entry", "production", "damages", "reports", "logs", "admin"].includes(hash) ? (hash as AppTab) : "entry";
+  return ["entry", "production", "damages", "dispatch", "reports", "logs", "admin"].includes(hash) ? (hash as AppTab) : "entry";
+}
+
+function tabAllowedForRole(tab: AppTab, permissions: string[]) {
+  if (permissions.includes("ADMIN")) return true;
+  if (["entry", "production", "damages"].includes(tab)) return permissions.includes("PRODUCTION");
+  if (tab === "dispatch") return permissions.includes("DISPATCH");
+  if (tab === "reports") return permissions.includes("REPORTS");
+  if (tab === "logs") return permissions.includes("LOGS");
+  return false;
+}
+
+function defaultTab(permissions: string[]): AppTab {
+  if (permissions.includes("PRODUCTION")) return "entry";
+  if (permissions.includes("DISPATCH")) return "dispatch";
+  if (permissions.includes("REPORTS")) return "reports";
+  if (permissions.includes("LOGS")) return "logs";
+  return "dispatch";
 }

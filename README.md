@@ -16,7 +16,7 @@ README.md
 
 - Email/password sign-in for local use, plus optional Google OAuth 2.0 sign-in with Passport.js.
 - Persistent login through JWT stored in an HTTP-only cookie.
-- Roles: `ADMIN` and `USER`.
+- Built-in roles plus admin-created custom roles with checkbox permissions.
 - Single-screen production entry with company buttons, SKU tiles, touch-friendly numeric inputs, damage toggle, and capacity warning.
 - Audit logs for create, update, and delete operations with previous values, new values, actor, and timestamp.
 - Reports filtered by date range with Excel and PDF download.
@@ -85,6 +85,7 @@ Seeded local users:
 ```text
 admin@example.com / admin12345
 user@example.com / user12345
+dispatch@example.com / dispatch12345
 ```
 
 5. Start backend and frontend:
@@ -212,12 +213,21 @@ VITE_API_URL=https://your-render-app.onrender.com
 - Edit production entries through the API.
 - Change user roles.
 - View all logs.
+- Access both production and dispatch workflows.
+- Create custom roles and assign permissions.
 
 `USER` can:
 
 - Create production entries.
 - View logs.
 - Download reports.
+
+`DISPATCH` can:
+
+- Create dispatch records.
+- View total quantity produced by company and variant.
+
+Custom roles can be created from the Admin tab using permissions for production, dispatch, reports, logs, and admin settings.
 
 ## API Summary
 

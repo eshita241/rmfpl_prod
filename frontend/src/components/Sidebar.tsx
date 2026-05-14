@@ -1,17 +1,20 @@
-import { AlertTriangle, ClipboardList, Download, FileText, ListChecks, LogOut, Menu, Shield, X } from "lucide-react";
+import { AlertTriangle, ClipboardList, Download, FileText, ListChecks, LogOut, Menu, Shield, Truck, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { promptInstall, subscribeInstallPrompt } from "../pwa";
 import { Button } from "./Button";
 
-export type AppTab = "entry" | "production" | "damages" | "reports" | "logs" | "admin";
+import type { Permission } from "../types/domain";
+
+export type AppTab = "entry" | "production" | "damages" | "dispatch" | "reports" | "logs" | "admin";
 
 const navItems = [
-  { id: "entry" as const, label: "New Entry", icon: ClipboardList, show: true },
-  { id: "production" as const, label: "Production Entries", icon: ClipboardList, show: true },
-  { id: "damages" as const, label: "Damages", icon: AlertTriangle, show: true },
-  { id: "reports" as const, label: "Reports", icon: FileText, show: true },
-  { id: "logs" as const, label: "Logs", icon: ListChecks, show: true },
-  { id: "admin" as const, label: "Admin", icon: Shield, show: false }
+  { id: "entry" as const, label: "New Entry", icon: ClipboardList, permission: "PRODUCTION" as const },
+  { id: "production" as const, label: "Production Entries", icon: ClipboardList, permission: "PRODUCTION" as const },
+  { id: "damages" as const, label: "Damages", icon: AlertTriangle, permission: "PRODUCTION" as const },
+  { id: "dispatch" as const, label: "Dispatch", icon: Truck, permission: "DISPATCH" as const },
+  { id: "reports" as const, label: "Reports", icon: FileText, permission: "REPORTS" as const },
+  { id: "logs" as const, label: "Logs", icon: ListChecks, permission: "LOGS" as const },
+  { id: "admin" as const, label: "Admin", icon: Shield, permission: "ADMIN" as const }
 ];
 
 export function Sidebar({
@@ -20,6 +23,7 @@ export function Sidebar({
   isAdmin,
   userName,
   role,
+  permissions,
   onLogout
 }: {
   current: AppTab;
@@ -27,6 +31,7 @@ export function Sidebar({
   isAdmin: boolean;
   userName: string;
   role: string;
+  permissions: Permission[];
   onLogout: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -48,7 +53,7 @@ export function Sidebar({
 
       <nav className="flex-1 space-y-2 p-3">
         {navItems
-          .filter((item) => item.show || (item.id === "admin" && isAdmin))
+          .filter((item) => permissions.includes(item.permission) || isAdmin)
           .map((item) => {
             const Icon = item.icon;
             const active = current === item.id;

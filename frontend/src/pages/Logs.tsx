@@ -91,7 +91,7 @@ function recordName(log: Log) {
 
   if (log.entity === "SKU") return String(value.name ?? "SKU");
   if (log.entity === "USER_ROLE") return String(value.email ?? "User role");
-  if (log.entity === "ENTRY" || log.entity === "DAMAGE") {
+  if (log.entity === "ENTRY" || log.entity === "DAMAGE" || log.entity === "DISPATCH") {
     const sku = value.sku as Record<string, unknown> | undefined;
     const company = value.company as Record<string, unknown> | undefined;
     return [company?.name, sku?.name].filter(Boolean).join(" | ") || log.entity;
@@ -110,6 +110,8 @@ function summarizeValue(value: unknown) {
   if (item.role) parts.push(`Role: ${item.role}`);
   if (item.name) parts.push(`Name: ${item.name}`);
   if (item.quantityProduced) parts.push(`Qty: ${item.quantityProduced}`);
+  if (item.quantity) parts.push(`Qty: ${item.quantity}`);
+  if (item.carNumber) parts.push(`Car: ${item.carNumber}`);
   if (item.amount) parts.push(`Damaged: ${item.amount}`);
   if (item.reason) parts.push(`Reason: ${item.reason}`);
   if (item.date) parts.push(`Date: ${String(item.date).slice(0, 10)}`);

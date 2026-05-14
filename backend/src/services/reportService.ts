@@ -1,8 +1,10 @@
 import ExcelJS from "exceljs";
 import PDFDocument from "pdfkit";
+import { listDispatches } from "./dispatchService.js";
 import { listEntries } from "./entryService.js";
 
 type ReportEntry = Awaited<ReturnType<typeof listEntries>>[number];
+type ReportDispatch = Awaited<ReturnType<typeof listDispatches>>[number];
 
 type ReportFilters = {
   startDate?: string;
@@ -48,6 +50,17 @@ function groupRowsByDate(rows: ReportRow[]) {
   return Array.from(groups.entries());
 }
 
+function groupDispatchesByDate(dispatches: ReportDispatch[]) {
+  const groups = new Map<string, ReportDispatch[]>();
+  dispatches.forEach((dispatch) => {
+    const date = dispatch.date.toISOString().slice(0, 10);
+    const dateRows = groups.get(date) ?? [];
+    dateRows.push(dispatch);
+    groups.set(date, dateRows);
+  });
+  return groups;
+}
+
 function totalQuantity(rows: ReportRow[], skuId: string) {
   return rows.reduce((total, row) => total + (row.entriesBySku.get(skuId)?.quantityProduced ?? 0), 0);
 }
@@ -59,17 +72,27 @@ function totalDamages(rows: ReportRow[], skuId: string) {
   }, 0);
 }
 
-function buildWideReport(entries: ReportEntry[]) {
+function buildWideReport(entries: ReportEntry[], dispatches: ReportDispatch[] = []) {
   const skus = Array.from(
     new Map(
-      entries.map((entry) => [
-        entry.skuId,
-        {
-          id: entry.skuId,
-          name: entry.sku.name,
-          company: entry.company.name
-        }
-      ])
+      [
+        ...entries.map((entry) => [
+          entry.skuId,
+          {
+            id: entry.skuId,
+            name: entry.sku.name,
+            company: entry.company.name
+          }
+        ] as const),
+        ...dispatches.map((dispatch) => [
+          dispatch.skuId,
+          {
+            id: dispatch.skuId,
+            name: dispatch.sku.name,
+            company: dispatch.company.name
+          }
+        ] as const)
+      ]
     ).values()
   ).sort((a, b) => `${a.company} ${a.name}`.localeCompare(`${b.company} ${b.name}`));
 
@@ -114,14 +137,70 @@ function styleSummaryRow(row: ExcelJS.Row, lastColumn: number, fillColor: string
   });
 }
 
+function totalDispatches(dispatches: ReportDispatch[], skuId: string) {
+  return dispatches.reduce((total, dispatch) => total + (dispatch.skuId === skuId ? dispatch.quantity : 0), 0);
+}
+
+type DispatchReportRow = {
+  label: string;
+  carNumber: string;
+  sealNumber: string;
+  time: string;
+  dispatches: ReportDispatch[];
+};
+
+function formatDispatchTime(dispatch: ReportDispatch) {
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).format(dispatch.createdAt);
+}
+
+function buildDispatchRows(dispatches: ReportDispatch[]): DispatchReportRow[] {
+  if (dispatches.length === 0) {
+    return [{ label: "Dispatch", carNumber: "Dispatch", sealNumber: "", time: "", dispatches: [] }];
+  }
+
+  const groups = new Map<string, ReportDispatch[]>();
+  dispatches.forEach((dispatch) => {
+    const seal = dispatch.sealNumber?.trim() || "-";
+    const key = `${dispatch.carNumber}|${seal}`;
+    const rows = groups.get(key) ?? [];
+    rows.push(dispatch);
+    groups.set(key, rows);
+  });
+
+  return Array.from(groups.values())
+    .map((rows) => {
+      const first = rows.slice().sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
+      const seal = first.sealNumber?.trim() || "-";
+      const time = formatDispatchTime(first);
+      return {
+        label: [first.carNumber, `Seal ${seal}`, time].join(" | "),
+        carNumber: first.carNumber,
+        sealNumber: seal,
+        time,
+        dispatches: rows
+      };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
 export async function buildExcelReport(filters: ReportFilters) {
-  const entries = await listEntries(filters);
+  const [entries, dispatches] = await Promise.all([listEntries(filters), listDispatches(filters)]);
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Bread Production");
   const includeDate = isDateRange(filters);
-  const { skus, rows } = buildWideReport(entries);
+  const { skus, rows } = buildWideReport(entries, dispatches);
+  const dispatchesByDate = groupDispatchesByDate(dispatches);
   const rowGroups = groupRowsByDate(rows);
-  const lastColumn = (includeDate ? 2 : 1) + skus.length * 2;
+  for (const date of dispatchesByDate.keys()) {
+    if (!rowGroups.some(([rowDate]) => rowDate === date)) rowGroups.push([date, []]);
+  }
+  rowGroups.sort(([a], [b]) => a.localeCompare(b));
+  const lastColumn = (includeDate ? 1 : 0) + 1 + skus.length * 2 + 1;
 
   let column = 1;
   if (includeDate) {
@@ -131,9 +210,10 @@ export async function buildExcelReport(filters: ReportFilters) {
     column += 1;
   }
 
+  const labelColumn = column;
   sheet.getCell(1, column).value = "Batch Number";
   sheet.mergeCells(1, column, 2, column);
-  sheet.getColumn(column).width = 16;
+  sheet.getColumn(column).width = 18;
   column += 1;
 
   skus.forEach((sku) => {
@@ -146,6 +226,10 @@ export async function buildExcelReport(filters: ReportFilters) {
     sheet.getColumn(firstColumn + 1).width = 36;
     column += 2;
   });
+
+  sheet.getCell(1, column).value = "Time";
+  sheet.mergeCells(1, column, 2, column);
+  sheet.getColumn(column).width = 10;
 
   sheet.getRows(1, 2)?.forEach((row) => {
     row.font = { bold: true };
@@ -162,6 +246,7 @@ export async function buildExcelReport(filters: ReportFilters) {
         const entry = row.entriesBySku.get(sku.id);
         values.push(entry?.mouldsUsed ?? null, entry?.quantityProduced ?? null);
       });
+      values.push(null);
 
       sheet.addRow(values);
     });
@@ -170,12 +255,28 @@ export async function buildExcelReport(filters: ReportFilters) {
     if (includeDate) totalValues.push(null);
     totalValues.push("Total Production");
     skus.forEach((sku) => totalValues.push(null, totalQuantity(dateRows, sku.id)));
+    totalValues.push(null);
     styleSummaryRow(sheet.addRow(totalValues), lastColumn, "FF92D050");
+
+    const dateDispatches = dispatchesByDate.get(date) ?? [];
+    buildDispatchRows(dateDispatches).forEach((dispatchRow) => {
+      const dispatchValues: (string | number | null)[] = [];
+      if (includeDate) dispatchValues.push(null);
+      dispatchValues.push(dispatchRow.carNumber);
+      skus.forEach((sku, index) => {
+        dispatchValues.push(index === 0 && dispatchRow.sealNumber ? `Seal ${dispatchRow.sealNumber}` : null, totalDispatches(dispatchRow.dispatches, sku.id));
+      });
+      dispatchValues.push(dispatchRow.time);
+      const dispatchExcelRow = sheet.addRow(dispatchValues);
+      styleSummaryRow(dispatchExcelRow, lastColumn, "FFBDD7EE");
+      dispatchExcelRow.getCell(labelColumn).alignment = { horizontal: "left", vertical: "middle", wrapText: true };
+    });
 
     const damageValues: (string | number | null)[] = [];
     if (includeDate) damageValues.push(null);
     damageValues.push("Damages");
     skus.forEach((sku) => damageValues.push(null, totalDamages(dateRows, sku.id)));
+    damageValues.push(null);
     styleSummaryRow(sheet.addRow(damageValues), lastColumn, "FFF4B183");
   });
 
@@ -191,7 +292,7 @@ function drawCell(doc: PDFKit.PDFDocument, text: string, x: number, y: number, w
   });
 }
 
-function drawPdfTable(doc: PDFKit.PDFDocument, rows: ReportRow[], skus: ReportSku[], includeDate: boolean) {
+function drawPdfTable(doc: PDFKit.PDFDocument, rows: ReportRow[], skus: ReportSku[], includeDate: boolean, dispatches: ReportDispatch[] = []) {
   const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
   const startX = doc.page.margins.left;
   let y = doc.y;
@@ -201,6 +302,11 @@ function drawPdfTable(doc: PDFKit.PDFDocument, rows: ReportRow[], skus: ReportSk
   const headerHeight = 28;
   const rowHeight = 20;
   const rowGroups = groupRowsByDate(rows);
+  const dispatchesByDate = groupDispatchesByDate(dispatches);
+  for (const date of dispatchesByDate.keys()) {
+    if (!rowGroups.some(([rowDate]) => rowDate === date)) rowGroups.push([date, []]);
+  }
+  rowGroups.sort(([a], [b]) => a.localeCompare(b));
 
   const drawHeader = () => {
     let x = startX;
@@ -263,6 +369,13 @@ function drawPdfTable(doc: PDFKit.PDFDocument, rows: ReportRow[], skus: ReportSk
     skus.forEach((sku) => totalValues.set(sku.id, { mould: "", quantity: String(totalQuantity(dateRows, sku.id)) }));
     drawReportRow("", "Total Production", totalValues, true);
 
+    const dateDispatches = dispatchesByDate.get(date) ?? [];
+    buildDispatchRows(dateDispatches).forEach((dispatchRow) => {
+      const dispatchValues = new Map<string, { mould: string; quantity: string }>();
+      skus.forEach((sku) => dispatchValues.set(sku.id, { mould: "", quantity: String(totalDispatches(dispatchRow.dispatches, sku.id)) }));
+      drawReportRow("", dispatchRow.label, dispatchValues, true);
+    });
+
     const damageValues = new Map<string, { mould: string; quantity: string }>();
     skus.forEach((sku) => damageValues.set(sku.id, { mould: "", quantity: String(totalDamages(dateRows, sku.id)) }));
     drawReportRow("", "Damages", damageValues, true);
@@ -270,11 +383,11 @@ function drawPdfTable(doc: PDFKit.PDFDocument, rows: ReportRow[], skus: ReportSk
 }
 
 export async function buildPdfReport(filters: ReportFilters) {
-  const entries = await listEntries(filters);
+  const [entries, dispatches] = await Promise.all([listEntries(filters), listDispatches(filters)]);
   const doc = new PDFDocument({ margin: 24, size: "A4", layout: "landscape" });
   const chunks: Buffer[] = [];
   const includeDate = isDateRange(filters);
-  const { skus, rows } = buildWideReport(entries);
+  const { skus, rows } = buildWideReport(entries, dispatches);
 
   doc.on("data", (chunk) => chunks.push(chunk));
   doc.fontSize(18).text("Production Report", { align: "center" });
@@ -282,7 +395,7 @@ export async function buildPdfReport(filters: ReportFilters) {
   doc.fontSize(10).text(`Period: ${filters.startDate ?? "All"} to ${filters.endDate ?? "All"}`);
   doc.moveDown();
 
-  drawPdfTable(doc, rows, skus, includeDate);
+  drawPdfTable(doc, rows, skus, includeDate, dispatches);
 
   doc.end();
 

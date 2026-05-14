@@ -2,10 +2,25 @@ import bcrypt from "bcryptjs";
 import { Role } from "@prisma/client";
 import { prisma } from "../config/prisma.js";
 import { AppError } from "../utils/errors.js";
+import { effectivePermissions, effectiveRoleName } from "./permissionService.js";
+
+function authUser(user: Awaited<ReturnType<typeof prisma.user.findUnique>> & { roleDefinition?: { name: string; permissions: string[] } | null }) {
+  if (!user) return null;
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    roleDefinitionId: user.roleDefinitionId,
+    roleName: effectiveRoleName(user),
+    permissions: effectivePermissions(user)
+  };
+}
 
 export async function loginWithPassword(email: string, password: string) {
   const user = await prisma.user.findUnique({
-    where: { email: email.toLowerCase() }
+    where: { email: email.toLowerCase() },
+    include: { roleDefinition: true }
   });
 
   if (!user?.passwordHash) {
@@ -17,12 +32,7 @@ export async function loginWithPassword(email: string, password: string) {
     throw new AppError("Email or password is incorrect.", 401);
   }
 
-  return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role
-  };
+  return authUser(user)!;
 }
 
 export async function createPasswordUser(input: {
@@ -48,10 +58,5 @@ export async function createPasswordUser(input: {
     }
   });
 
-  return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role
-  };
+  return authUser({ ...user, roleDefinition: null })!;
 }

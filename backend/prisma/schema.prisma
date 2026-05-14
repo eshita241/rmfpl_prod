@@ -10,6 +10,7 @@ datasource db {
 enum Role {
   ADMIN
   USER
+  DISPATCH
 }
 
 enum ActionType {
@@ -22,6 +23,7 @@ enum LogEntity {
   SKU
   ENTRY
   DAMAGE
+  DISPATCH
   USER_ROLE
 }
 
@@ -37,11 +39,24 @@ model User {
   email     String   @unique
   passwordHash String?
   role      Role     @default(USER)
+  roleDefinitionId String?
   createdAt DateTime @default(now())
 
   entries ProductionEntry[] @relation("EntryCreator")
   damages DamageEntry[]     @relation("DamageCreator")
+  dispatches DispatchEntry[] @relation("DispatchCreator")
   logs    Log[]             @relation("LogPerformer")
+  roleDefinition RoleDefinition? @relation(fields: [roleDefinitionId], references: [id], onDelete: SetNull)
+}
+
+model RoleDefinition {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  permissions String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users User[]
 }
 
 model Company {
@@ -51,6 +66,7 @@ model Company {
   skus    SKU[]
   entries ProductionEntry[]
   damageEntries DamageEntry[]
+  dispatchEntries DispatchEntry[]
 }
 
 model SKU {
@@ -66,6 +82,7 @@ model SKU {
   company Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
   entries ProductionEntry[]
   damageEntries DamageEntry[]
+  dispatchEntries DispatchEntry[]
 
   @@unique([name, companyId])
 }
@@ -111,6 +128,26 @@ model DamageEntry {
   company Company @relation(fields: [companyId], references: [id])
   sku     SKU     @relation(fields: [skuId], references: [id])
   creator User    @relation("DamageCreator", fields: [createdBy], references: [id])
+}
+
+model DispatchEntry {
+  id                 String   @id @default(cuid())
+  date               DateTime
+  companyId          String
+  skuId              String
+  quantity           Int
+  carNumber          String
+  sealNumber         String?
+  cratesSent         Int      @default(0)
+  cratesReceived     Int      @default(0)
+  createdBy          String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  deletedAt          DateTime?
+
+  company Company @relation(fields: [companyId], references: [id])
+  sku     SKU     @relation(fields: [skuId], references: [id])
+  creator User    @relation("DispatchCreator", fields: [createdBy], references: [id])
 }
 
 model Log {

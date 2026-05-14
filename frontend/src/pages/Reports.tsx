@@ -20,7 +20,7 @@ export function Reports({ isAdmin }: { isAdmin: boolean }) {
   const [confirmDownload, setConfirmDownload] = useState(false);
   const [filters, setFilters] = useState({ companyId: "", skuId: "" });
   const [selectedSummarySkuId, setSelectedSummarySkuId] = useState("");
-  const [logsVisible, setLogsVisible] = useState(true);
+  const [logsVisible, setLogsVisible] = useState(false);
   const [entryToEdit, setEntryToEdit] = useState<ProductionEntry | null>(null);
   const [entryToArchive, setEntryToArchive] = useState<ProductionEntry | null>(null);
   const companies = useQuery({ queryKey: ["companies"], queryFn: getCompanies });
@@ -149,15 +149,14 @@ export function Reports({ isAdmin }: { isAdmin: boolean }) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-lg font-bold text-ink">SKU Totals</h3>
           <div className="flex flex-wrap gap-2">
-            {selectedSummarySkuId || !logsVisible ? (
-              <Button onClick={() => {
-                setSelectedSummarySkuId("");
-                setLogsVisible(true);
-              }}>
-                Show All Logs
+            {selectedSummarySkuId ? (
+              <Button onClick={() => setSelectedSummarySkuId("")}>
+                Clear Selection
               </Button>
             ) : null}
-            {logsVisible ? <Button onClick={() => setLogsVisible(false)}>Hide All Logs</Button> : null}
+            <Button tone={logsVisible ? "quiet" : "primary"} onClick={() => setLogsVisible((visible) => !visible)}>
+              {logsVisible ? "Hide Logs" : selectedSummarySkuId ? "Show Selected Logs" : "Show All Logs"}
+            </Button>
           </div>
         </div>
         {skuSummaries.length > 0 ? (
