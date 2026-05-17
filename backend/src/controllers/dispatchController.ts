@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
-import { createDispatch, listDispatches, listProductionTotals } from "../services/dispatchService.js";
+import { createDispatch, listDispatches, listProductionTotals, updateDispatch } from "../services/dispatchService.js";
+import { param } from "../utils/request.js";
 
 const dispatchSchema = z.object({
   date: z.string().min(10),
@@ -22,6 +23,10 @@ const filtersSchema = z.object({
 
 export async function postDispatch(req: Request, res: Response) {
   res.status(201).json(await createDispatch(dispatchSchema.parse(req.body), req.user!.id));
+}
+
+export async function putDispatch(req: Request, res: Response) {
+  res.json(await updateDispatch(param(req, "id"), dispatchSchema.parse(req.body), req.user!.id));
 }
 
 export async function getDispatches(req: Request, res: Response) {

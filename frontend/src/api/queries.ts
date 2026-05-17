@@ -51,6 +51,8 @@ export const createDispatch = (body: unknown) =>
     method: "POST",
     body: JSON.stringify(body)
   });
+export const updateDispatch = (id: string, body: unknown) =>
+  api<DispatchEntry>(`/dispatches/${id}`, { method: "PUT", body: JSON.stringify(body) });
 export const getDispatches = (startDate?: string, endDate?: string, filters: { companyId?: string; skuId?: string } = {}) => {
   const params = new URLSearchParams();
   if (startDate) params.set("startDate", startDate);

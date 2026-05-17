@@ -65,7 +65,7 @@ export function App() {
   const isAdmin = permissions.includes("ADMIN");
   const activeTab = tabAllowedForRole(tab, permissions) ? tab : defaultTab(permissions);
   const content =
-    activeTab === "entry" ? <NewEntry isAdmin={isAdmin} /> : activeTab === "production" ? <ProductionEntries /> : activeTab === "damages" ? <Damages isAdmin={isAdmin} /> : activeTab === "dispatch" ? <Dispatch /> : activeTab === "reports" ? <Reports isAdmin={isAdmin} /> : activeTab === "logs" ? <Logs /> : <Admin />;
+    activeTab === "entry" ? <NewEntry isAdmin={isAdmin} /> : activeTab === "production" ? <ProductionEntries /> : activeTab === "damages" ? <Damages isAdmin={isAdmin} /> : activeTab === "dispatch" ? <Dispatch isAdmin={isAdmin} /> : activeTab === "reports" ? <Reports isAdmin={isAdmin} /> : activeTab === "logs" ? <Logs /> : <Admin />;
 
   return (
     <main className="min-h-screen bg-paper text-ink">

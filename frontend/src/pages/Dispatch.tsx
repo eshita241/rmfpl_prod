@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Boxes, ClipboardCheck, PackageCheck, Save, Truck } from "lucide-react";
-import { createDispatch, getCompanies, getDispatchProductionTotals, getDispatches, getSkus } from "../api/queries";
+import { Boxes, ClipboardCheck, Edit3, PackageCheck, Save, Truck, X } from "lucide-react";
+import { createDispatch, getCompanies, getDispatchProductionTotals, getDispatches, getSkus, updateDispatch } from "../api/queries";
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
 import { SelectField } from "../components/SelectField";
+import type { DispatchEntry } from "../types/domain";
 import { localDateInputValue } from "../utils/date";
 import { formatIst } from "../utils/time";
 
@@ -27,10 +28,12 @@ const initialForm: DispatchForm = {
   cratesReceived: "0"
 };
 
-export function Dispatch() {
+export function Dispatch({ isAdmin }: { isAdmin: boolean }) {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState({ date: today, companyId: "", skuId: "" });
   const [form, setForm] = useState(initialForm);
+  const [editingDispatchId, setEditingDispatchId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState(initialForm);
   const [message, setMessage] = useState("");
   const companies = useQuery({ queryKey: ["companies"], queryFn: getCompanies });
   const filterSkus = useQuery({ queryKey: ["skus", filters.companyId], queryFn: () => getSkus(filters.companyId), enabled: Boolean(filters.companyId) });
@@ -81,6 +84,39 @@ export function Dispatch() {
     },
     onError: (error: Error) => setMessage(error.message)
   });
+  const updateMutation = useMutation({
+    mutationFn: (dispatchId: string) =>
+      updateDispatch(dispatchId, {
+        ...editForm,
+        date: filters.date,
+        companyId: filters.companyId,
+        skuId: filters.skuId,
+        quantity: Number(editForm.quantity),
+        cratesSent: Number(editForm.cratesSent || 0),
+        cratesReceived: Number(editForm.cratesReceived || 0)
+      }),
+    onSuccess: () => {
+      setMessage("Dispatch entry updated.");
+      setEditingDispatchId(null);
+      setEditForm(initialForm);
+      queryClient.invalidateQueries({ queryKey: ["dispatches"] });
+      queryClient.invalidateQueries({ queryKey: ["dispatch-production-totals"] });
+      queryClient.invalidateQueries({ queryKey: ["logs"] });
+    },
+    onError: (error: Error) => setMessage(error.message)
+  });
+
+  function startEdit(dispatch: DispatchEntry) {
+    setEditingDispatchId(dispatch.id);
+    setEditForm({
+      quantity: String(dispatch.quantity),
+      carNumber: dispatch.carNumber,
+      sealNumber: dispatch.sealNumber ?? "",
+      cratesSent: String(dispatch.cratesSent),
+      cratesReceived: String(dispatch.cratesReceived)
+    });
+    setMessage("");
+  }
 
   return (
     <div className="space-y-6">
@@ -197,19 +233,101 @@ export function Dispatch() {
                       <th>Seal No.</th>
                       {isModern ? <th>Crates Sent</th> : null}
                       {isModern ? <th>Crates Received</th> : null}
+                      {isAdmin ? <th className="w-28">Actions</th> : null}
                     </tr>
                   </thead>
                   <tbody>
-                    {(dispatches.data ?? []).map((dispatch) => (
-                      <tr key={dispatch.id} className="border-t border-line">
-                        <td className="p-3">{formatIst(dispatch.createdAt)}</td>
-                        <td className="font-bold">{dispatch.carNumber}</td>
-                        <td>{dispatch.quantity}</td>
-                        <td>{dispatch.sealNumber ?? "-"}</td>
-                        {isModern ? <td>{dispatch.cratesSent}</td> : null}
-                        {isModern ? <td>{dispatch.cratesReceived}</td> : null}
-                      </tr>
-                    ))}
+                    {(dispatches.data ?? []).map((dispatch) => {
+                      const isEditing = editingDispatchId === dispatch.id;
+                      const editCarNumberIsValid = !editForm.carNumber || vehicleNumberPattern.test(normalizeVehicleNumber(editForm.carNumber));
+                      const editQuantity = Number(editForm.quantity || 0);
+                      const editQuantityLimit = quantityRemaining + dispatch.quantity;
+                      const editQuantityExceedsRemaining = Boolean(editForm.quantity && editQuantity > editQuantityLimit);
+                      const canSaveEdit = editForm.quantity && editForm.carNumber && editCarNumberIsValid && !editQuantityExceedsRemaining && editQuantity > 0;
+
+                      return (
+                        <tr key={dispatch.id} className="border-t border-line align-middle">
+                          <td className="p-3">{formatIst(dispatch.createdAt)}</td>
+                          <td className="pr-3 font-bold">
+                            {isEditing ? (
+                              <Field
+                                label="Vehicle"
+                                value={editForm.carNumber}
+                                error={editCarNumberIsValid ? undefined : "Invalid"}
+                                onChange={(e) => setEditForm({ ...editForm, carNumber: e.target.value.toUpperCase() })}
+                              />
+                            ) : (
+                              dispatch.carNumber
+                            )}
+                          </td>
+                          <td className="pr-3">
+                            {isEditing ? (
+                              <Field
+                                label="Quantity"
+                                type="number"
+                                inputMode="numeric"
+                                max={editQuantityLimit || undefined}
+                                error={editQuantityExceedsRemaining ? `Max ${editQuantityLimit}` : undefined}
+                                value={editForm.quantity}
+                                onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })}
+                              />
+                            ) : (
+                              dispatch.quantity
+                            )}
+                          </td>
+                          <td className="pr-3">
+                            {isEditing && isModern ? (
+                              <Field label="Seal No." value={editForm.sealNumber} onChange={(e) => setEditForm({ ...editForm, sealNumber: e.target.value })} />
+                            ) : (
+                              dispatch.sealNumber ?? "-"
+                            )}
+                          </td>
+                          {isModern ? (
+                            <td className="pr-3">
+                              {isEditing ? (
+                                <Field label="Sent" type="number" inputMode="numeric" value={editForm.cratesSent} onChange={(e) => setEditForm({ ...editForm, cratesSent: e.target.value })} />
+                              ) : (
+                                dispatch.cratesSent
+                              )}
+                            </td>
+                          ) : null}
+                          {isModern ? (
+                            <td className="pr-3">
+                              {isEditing ? (
+                                <Field label="Received" type="number" inputMode="numeric" value={editForm.cratesReceived} onChange={(e) => setEditForm({ ...editForm, cratesReceived: e.target.value })} />
+                              ) : (
+                                dispatch.cratesReceived
+                              )}
+                            </td>
+                          ) : null}
+                          {isAdmin ? (
+                            <td className="pr-3">
+                              {isEditing ? (
+                                <div className="flex gap-2">
+                                  <Button className="grid h-11 min-h-0 w-11 place-items-center p-0" title="Save dispatch changes" tone="primary" disabled={updateMutation.isPending || !canSaveEdit} onClick={() => updateMutation.mutate(dispatch.id)}>
+                                    <Save size={18} />
+                                  </Button>
+                                  <Button
+                                    className="grid h-11 min-h-0 w-11 place-items-center p-0"
+                                    title="Cancel edit"
+                                    onClick={() => {
+                                      setEditingDispatchId(null);
+                                      setEditForm(initialForm);
+                                    }}
+                                  >
+                                    <X size={18} />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <Button className="grid h-11 min-h-0 w-11 place-items-center p-0" title="Edit dispatch" onClick={() => startEdit(dispatch)}>
+                                  <Edit3 size={18} />
+                                </Button>
+                              )}
+                            </td>
+                          ) : null}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

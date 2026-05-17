@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { getCompanies, getLogs, getReport, downloadApp } from "../controllers/baseControllers.js";
 import { getDamages, postDamage, putDamage, removeDamage } from "../controllers/damageController.js";
-import { getDispatches, getDispatchProductionTotals, postDispatch } from "../controllers/dispatchController.js";
+import { getDispatches, getDispatchProductionTotals, postDispatch, putDispatch } from "../controllers/dispatchController.js";
 import { getEntries, getNextBatch, postEntry, putEntry, removeEntry } from "../controllers/entryController.js";
 import { getSkus, postSku, putSku, removeSku } from "../controllers/skuController.js";
 import { getPermissions, getRoleDefinitions, getUsers, patchUserRole, postRoleDefinition, removeUser } from "../controllers/userController.js";
@@ -32,6 +32,7 @@ routes.put("/damages/:id", requirePermission("ADMIN"), asyncHandler(putDamage));
 routes.delete("/damages/:id", requirePermission("ADMIN"), asyncHandler(removeDamage));
 routes.post("/dispatches", requirePermission("DISPATCH"), asyncHandler(postDispatch));
 routes.get("/dispatches", requirePermission("DISPATCH"), asyncHandler(getDispatches));
+routes.put("/dispatches/:id", requirePermission("ADMIN"), asyncHandler(putDispatch));
 routes.get("/dispatches/production-totals", requirePermission("DISPATCH"), asyncHandler(getDispatchProductionTotals));
 routes.get("/logs", requirePermission("LOGS"), asyncHandler(getLogs));
 routes.get("/reports", requirePermission("REPORTS"), asyncHandler(getReport));

@@ -1,6 +1,6 @@
 import { ActionType, LogEntity } from "@prisma/client";
 import { prisma } from "../config/prisma.js";
-import { AppError } from "../utils/errors.js";
+import { AppError, notFound } from "../utils/errors.js";
 import { safeUserSelect } from "../utils/selects.js";
 import { writeLog } from "./logService.js";
 
@@ -49,7 +49,7 @@ function assertValidVehicleNumber(carNumber: string) {
   }
 }
 
-async function dispatchQuantityState(input: Pick<DispatchInput, "date" | "companyId" | "skuId">) {
+async function dispatchQuantityState(input: Pick<DispatchInput, "date" | "companyId" | "skuId">, excludeDispatchId?: string) {
   const date = new Date(input.date);
   const [produced, dispatched] = await Promise.all([
     prisma.productionEntry.aggregate({
@@ -64,6 +64,7 @@ async function dispatchQuantityState(input: Pick<DispatchInput, "date" | "compan
     prisma.dispatchEntry.aggregate({
       where: {
         deletedAt: null,
+        ...(excludeDispatchId ? { id: { not: excludeDispatchId } } : {}),
         date,
         companyId: input.companyId,
         skuId: input.skuId
@@ -116,6 +117,51 @@ export async function createDispatch(input: DispatchInput, createdBy: string) {
     entityId: entry.id,
     newValues: entry,
     performedBy: createdBy
+  });
+
+  return entry;
+}
+
+export async function updateDispatch(id: string, input: DispatchInput, performedBy: string) {
+  const previous = await prisma.dispatchEntry.findUnique({ where: { id } });
+  if (!previous) throw notFound("Dispatch entry not found");
+  if (previous.deletedAt) throw notFound("Dispatch entry has been archived");
+
+  const sku = await validateDispatchInput(input);
+  const isModern = sku.company.name.toLowerCase() === "modern";
+  const carNumber = normalizeVehicleNumber(input.carNumber);
+  assertValidVehicleNumber(carNumber);
+
+  const quantityState = await dispatchQuantityState(input, id);
+  if (input.quantity > quantityState.quantityRemaining) {
+    throw new AppError(
+      `Dispatch quantity cannot exceed remaining production quantity. Produced: ${quantityState.quantityProduced}. Already dispatched: ${quantityState.quantityDispatched}. Remaining allowed: ${quantityState.quantityRemaining}.`,
+      400
+    );
+  }
+
+  const entry = await prisma.dispatchEntry.update({
+    where: { id },
+    data: {
+      date: new Date(input.date),
+      companyId: input.companyId,
+      skuId: input.skuId,
+      quantity: input.quantity,
+      carNumber,
+      sealNumber: isModern ? input.sealNumber?.trim() || null : null,
+      cratesSent: isModern ? input.cratesSent ?? 0 : 0,
+      cratesReceived: isModern ? input.cratesReceived ?? 0 : 0
+    },
+    include: { company: true, sku: true, creator: { select: safeUserSelect } }
+  });
+
+  await writeLog({
+    actionType: ActionType.UPDATE,
+    entity: LogEntity.DISPATCH,
+    entityId: id,
+    previousValues: previous,
+    newValues: entry,
+    performedBy
   });
 
   return entry;
